@@ -1,0 +1,84 @@
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Database Migrations (run once, then exit) ────────────────────
+  db-migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql://postgres:mysecretpassword@db:5432/postgres
+    command: ["bun", "x", "prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # ─── Backend (Express API) ────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:mysecretpassword@db:5432/postgres
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
+  # ─── Frontend (Next.js) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        DATABASE_URL: postgresql://postgres:mysecretpassword@db:5432/postgres
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:mysecretpassword@db:5432/postgres
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
+  # ─── WebSocket Server ────────────────────────────────────────────
+  ws:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ws
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:mysecretpassword@db:5432/postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
