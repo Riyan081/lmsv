@@ -11,14 +11,17 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@repo/auth": "*",
+    "@repo/db": "*",
+    "@repo/typescript-config": "*",
     "@repo/ui": "*",
+    "@tailwindcss/postcss": "^4.3.3",
+    "better-auth": "^1.2.0",
     "next": "16.2.0",
+    "postcss": "^8.5.26",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-     "@repo/db":"*",
-    "@repo/auth": "*",
-    "better-auth": "^1.2.0",
-    "@repo/typescript-config": "*"
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",

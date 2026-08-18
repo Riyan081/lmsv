@@ -1,8 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ─── Prisma Schema for University LMS Platform ─────────────────────
+//
+// This schema defines the complete data model for the LMS.
+// Better Auth core models (User, Session, Account, Verification, TwoFactor)
+// are preserved and extended with LMS-specific fields.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,7 +13,121 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Better Auth Core Models ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════════
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum SubjectType {
+  theory
+  practical
+  elective
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+}
+
+enum LeaveType {
+  medical
+  personal
+  emergency
+  other
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ExamType {
+  internal
+  midterm
+  endsem
+  supplementary
+}
+
+enum AcademicEventType {
+  holiday
+  exam_period
+  event
+  seminar
+  workshop
+  sports
+}
+
+enum HostelType {
+  boys
+  girls
+}
+
+enum ComplaintCategory {
+  plumbing
+  electrical
+  furniture
+  cleaning
+  other
+}
+
+enum ComplaintStatus {
+  open
+  in_progress
+  resolved
+}
+
+enum AnnouncementType {
+  global
+  department
+  class
+  hostel
+}
+
+enum ActivityAction {
+  create
+  update
+  delete
+  approve
+  reject
+  login
+  logout
+}
+
+enum ActivityModule {
+  auth
+  department
+  student
+  faculty
+  attendance
+  leave
+  exam
+  hostel
+  timetable
+  announcement
+  calendar
+  system
+}
+
+enum Grade {
+  A_PLUS  @map("A+")
+  A       @map("A")
+  B_PLUS  @map("B+")
+  B       @map("B")
+  C       @map("C")
+  D       @map("D")
+  F       @map("F")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BETTER AUTH CORE MODELS
+// ═══════════════════════════════════════════════════════════════════
 
 model User {
   id               String    @id
@@ -24,41 +138,77 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  // Custom fields
-  role             String    @default("user")  // "user" | "premium" | "admin"
-  
-  // Two-Factor Authentication
-  twoFactorEnabled Boolean?  @default(false)
+  // ─── Role & Profile ─────────────────────────────────────────
+  // Kept as String because Better Auth's admin plugin writes role
+  // as a plain string. Converting to enum would break auth flows.
+  // Roles: "admin" | "faculty" | "student" | "warden"
+  role             String    @default("student")
 
-  // Admin plugin fields
+  phone            String?
+  dateOfBirth      DateTime?
+  gender           Gender?
+  address          String?
+
+  // Student-specific fields
+  enrollmentNo     String?   @unique
+  guardianName     String?
+  guardianPhone    String?
+
+  // Faculty/Staff-specific fields
+  employeeId       String?   @unique
+
+  // ─── Academic Assignment ────────────────────────────────────
+  departmentId     String?
+  department       Department? @relation(fields: [departmentId], references: [id])
+  batchId          String?
+  batch            Batch?     @relation(fields: [batchId], references: [id])
+  sectionId        String?
+  section          Section?   @relation(fields: [sectionId], references: [id])
+
+  // ─── Better Auth Plugin Fields ──────────────────────────────
+  twoFactorEnabled Boolean?  @default(false)
   banned           Boolean?  @default(false)
   banReason        String?
   banExpires       DateTime?
 
-  // Relations
+  // ─── Better Auth Relations ──────────────────────────────────
   sessions         Session[]
   accounts         Account[]
+
+  // ─── LMS Relations ──────────────────────────────────────────
+  attendancesAsStudent  Attendance[]       @relation("StudentAttendance")
+  attendancesMarked     Attendance[]       @relation("MarkedByAttendance")
+  leaveApplications     LeaveApplication[] @relation("UserLeave")
+  leaveApprovals        LeaveApplication[] @relation("LeaveApprover")
+  facultySubjects       FacultySubject[]
+  timetableSlots        TimetableSlot[]
+  announcementsCreated  Announcement[]
+  activityLogs          ActivityLog[]
+  examsCreated          Exam[]             @relation("ExamCreator")
+  resultsAsStudent      Result[]
+  hostelAllocations     HostelAllocation[]
+  gatePassRequests      GatePass[]         @relation("GatePassStudent")
+  gatePassApprovals     GatePass[]         @relation("GatePassApprover")
+  hostelComplaints      HostelComplaint[]
+  academicEventsCreated AcademicEvent[]
+  hostelsAsWarden       Hostel[]           @relation("HostelWarden")
 
   @@map("user")
 }
 
 model Session {
-  id             String   @id
-  expiresAt      DateTime
-  token          String   @unique
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  ipAddress      String?
-  userAgent      String?
-
-  // Active organization (for future use)
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
   activeOrganizationId String?
+  impersonatedBy       String?
 
-  // Impersonation (admin plugin)
-  impersonatedBy String?
-
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
@@ -83,7 +233,7 @@ model Account {
 }
 
 model Verification {
-  id         String   @id
+  id         String    @id
   identifier String
   value      String
   expiresAt  DateTime
@@ -93,8 +243,6 @@ model Verification {
   @@map("verification")
 }
 
-// ─── Two-Factor Authentication ─────────────────────────────────────
-
 model TwoFactor {
   id          String @id
   secret      String
@@ -102,4 +250,414 @@ model TwoFactor {
   userId      String
 
   @@map("twoFactor")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ACADEMIC STRUCTURE
+// ═══════════════════════════════════════════════════════════════════
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Computer Science and Engineering"
+  code        String   @unique  // e.g., "CSE", "ME", "CE"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users          User[]
+  programs       Program[]
+  subjects       Subject[]
+  academicEvents AcademicEvent[]
+
+  @@map("department")
+}
+
+model Program {
+  id             String     @id @default(cuid())
+  name           String     // e.g., "B.Tech", "M.Tech", "MBA"
+  code           String     @unique // e.g., "BTECH", "MTECH"
+  durationYears  Int        // e.g., 4
+  totalSemesters Int        // e.g., 8
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  batches   Batch[]
+  semesters Semester[]
+
+  @@map("program")
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String   // e.g., "2023-2027"
+  startYear Int
+  endYear   Int
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users    User[]
+  sections Section[]
+
+  @@unique([name, programId])
+  @@map("batch")
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  name      String   // e.g., "A", "B", "C"
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  facultySubjects FacultySubject[]
+  timetableSlots  TimetableSlot[]
+
+  @@unique([name, batchId])
+  @@map("section")
+}
+
+model Semester {
+  id        String   @id @default(cuid())
+  number    Int      // 1, 2, 3, ... 8
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  subjects        Subject[]
+  facultySubjects FacultySubject[]
+  timetableSlots  TimetableSlot[]
+  exams           Exam[]
+  results         Result[]
+
+  @@unique([number, programId])
+  @@map("semester")
+}
+
+model Subject {
+  id           String      @id @default(cuid())
+  name         String      // e.g., "Data Structures and Algorithms"
+  code         String      @unique // e.g., "CS301"
+  credits      Int         // e.g., 4
+  type         SubjectType @default(theory)
+  semesterId   String
+  semester     Semester    @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  facultySubjects FacultySubject[]
+  timetableSlots  TimetableSlot[]
+  attendances     Attendance[]
+  exams           Exam[]
+  results         Result[]
+
+  @@map("subject")
+}
+
+/// Maps a faculty member to a subject they teach for a specific section/semester.
+model FacultySubject {
+  id         String   @id @default(cuid())
+  facultyId  String
+  faculty    User     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semesterId String
+  semester   Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  sectionId  String
+  section    Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([facultyId, subjectId, semesterId, sectionId])
+  @@map("faculty_subject")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TIMETABLE
+// ═══════════════════════════════════════════════════════════════════
+
+model TimetableSlot {
+  id         String   @id @default(cuid())
+  dayOfWeek  Int      // 0=Monday, 1=Tuesday, ... 5=Saturday
+  startTime  String   // "09:00" (24h format)
+  endTime    String   // "10:00"
+  room       String?  // "Room 101", "Lab A3"
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  facultyId  String
+  faculty    User     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  sectionId  String
+  section    Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  semesterId String
+  semester   Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("timetable_slot")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ATTENDANCE
+// ═══════════════════════════════════════════════════════════════════
+
+model Attendance {
+  id         String           @id @default(cuid())
+  studentId  String
+  student    User             @relation("StudentAttendance", fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  date       DateTime         @db.Date
+  period     Int              // Period number (1, 2, 3, ...)
+  status     AttendanceStatus @default(present)
+  markedById String
+  markedBy   User             @relation("MarkedByAttendance", fields: [markedById], references: [id])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([studentId, subjectId, date, period])
+  @@index([subjectId, date])
+  @@index([studentId, date])
+  @@map("attendance")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEAVE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+model LeaveApplication {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation("UserLeave", fields: [userId], references: [id], onDelete: Cascade)
+  type          LeaveType
+  startDate     DateTime       @db.Date
+  endDate       DateTime       @db.Date
+  reason        String
+  status        ApprovalStatus @default(pending)
+  approvedById  String?
+  approvedBy    User?          @relation("LeaveApprover", fields: [approvedById], references: [id])
+  approverNote  String?
+  attachmentUrl String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("leave_application")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EXAMINATION & RESULTS
+// ═══════════════════════════════════════════════════════════════════
+
+model Exam {
+  id          String   @id @default(cuid())
+  name        String   // "Mid-Term Exam 1", "End Semester Exam"
+  type        ExamType
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semesterId  String
+  semester    Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  totalMarks  Int
+  createdById String
+  createdBy   User     @relation("ExamCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  results Result[]
+
+  @@map("exam")
+}
+
+model Result {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examId        String
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semesterId    String
+  semester      Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  marksObtained Float
+  grade         Grade?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, examId])
+  @@index([studentId, semesterId])
+  @@map("result")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ACADEMIC CALENDAR
+// ═══════════════════════════════════════════════════════════════════
+
+model AcademicEvent {
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  startDate    DateTime          @db.Date
+  endDate      DateTime          @db.Date
+  type         AcademicEventType
+  departmentId String?           // null = institution-wide
+  department   Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdById  String
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([startDate, endDate])
+  @@map("academic_event")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HOSTEL MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+model Hostel {
+  id         String    @id @default(cuid())
+  name       String    // "Boys Hostel Block A"
+  type       HostelType
+  wardenId   String?
+  warden     User?     @relation("HostelWarden", fields: [wardenId], references: [id], onDelete: SetNull)
+  totalRooms Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  rooms HostelRoom[]
+
+  @@map("hostel")
+}
+
+model HostelRoom {
+  id         String   @id @default(cuid())
+  hostelId   String
+  hostel     Hostel   @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  roomNumber String
+  floor      Int
+  capacity   Int      @default(2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  allocations HostelAllocation[]
+  complaints  HostelComplaint[]
+
+  @@unique([hostelId, roomNumber])
+  @@map("hostel_room")
+}
+
+model HostelAllocation {
+  id            String     @id @default(cuid())
+  studentId     String
+  student       User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  roomId        String
+  room          HostelRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  allocatedDate DateTime   @db.Date
+  vacatedDate   DateTime?  @db.Date
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([studentId, isActive])
+  @@map("hostel_allocation")
+}
+
+model GatePass {
+  id                 String         @id @default(cuid())
+  studentId          String
+  student            User           @relation("GatePassStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reason             String
+  outDate            DateTime       @db.Date
+  outTime            String         // "14:00"
+  expectedReturnDate DateTime       @db.Date
+  returnTime         String?        // "18:00" — filled when student returns
+  status             ApprovalStatus @default(pending)
+  approvedById       String?
+  approvedBy         User?          @relation("GatePassApprover", fields: [approvedById], references: [id])
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([studentId, status])
+  @@map("gate_pass")
+}
+
+model HostelComplaint {
+  id          String            @id @default(cuid())
+  studentId   String
+  student     User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  roomId      String
+  room        HostelRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  category    ComplaintCategory
+  description String
+  status      ComplaintStatus   @default(open)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
+  @@map("hostel_complaint")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ANNOUNCEMENTS
+// ═══════════════════════════════════════════════════════════════════
+
+model Announcement {
+  id          String           @id @default(cuid())
+  title       String
+  content     String
+  type        AnnouncementType
+  targetId    String?          // departmentId, sectionId, or hostelId (based on type)
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  scheduledAt DateTime?
+  isPinned    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([type, targetId])
+  @@index([createdAt])
+  @@map("announcement")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ACTIVITY LOG & AUDIT
+// ═══════════════════════════════════════════════════════════════════
+
+model ActivityLog {
+  id          String         @id @default(cuid())
+  userId      String?
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      ActivityAction
+  module      ActivityModule
+  entityType  String?        // "User" | "Department" | "Attendance" | etc.
+  entityId    String?
+  description String
+  metadata    Json?          // Before/after snapshots, extra context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_log")
 }

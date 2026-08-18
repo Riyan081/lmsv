@@ -4,13 +4,13 @@ import { admin, twoFactor, bearer, openAPI } from "better-auth/plugins";
 import prisma from "@repo/db/client";
 
 /**
- * Core Better Auth server configuration.
+ * Core Better Auth server configuration for the LMS Platform.
  *
  * This is the shared auth instance used by both the Express API (apps/https)
  * and the Next.js frontend (apps/web). Each app mounts this via its own
  * route handler (toNodeHandler / toNextJsHandler).
  *
- * Roles: "user" (default), "premium", "admin"
+ * Roles: "admin" | "faculty" | "student" | "warden"
  */
 export const auth = betterAuth({
   // ─── Database ────────────────────────────────────────────────
@@ -19,7 +19,7 @@ export const auth = betterAuth({
   }),
 
   // ─── App Identity ────────────────────────────────────────────
-  appName: "Todo App",
+  appName: "University LMS",
 
   // ─── Trusted Origins (CSRF whitelist) ────────────────────────
   trustedOrigins: process.env.TRUSTED_ORIGINS
@@ -73,7 +73,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: false,
-        defaultValue: "user",
+        defaultValue: "student",
         input: false, // Users cannot set their own role on sign-up
       },
     },
@@ -115,12 +115,12 @@ export const auth = betterAuth({
   plugins: [
     // Admin plugin — user management, banning, listing
     admin({
-      defaultRole: "user",
+      defaultRole: "student",
     }),
 
     // Two-Factor Authentication — TOTP + backup codes
     twoFactor({
-      issuer: "Todo App",
+      issuer: "University LMS",
       totpOptions: {
         digits: 6,
         period: 30,
@@ -154,7 +154,7 @@ export const auth = betterAuth({
     // Force secure cookies (in production)
     useSecureCookies: process.env.NODE_ENV === "production",
     // Custom cookie prefix
-    cookiePrefix: "todo-app",
+    cookiePrefix: "lms",
     // Default cookie attributes
     defaultCookieAttributes: {
       sameSite: "lax",
@@ -174,6 +174,32 @@ export const auth = betterAuth({
           const ctx = hookData.ctx;
           const ip = ctx?.request?.headers?.get?.("x-forwarded-for") ?? "unknown";
           const ua = ctx?.request?.headers?.get?.("user-agent") ?? "unknown";
+
+          // Log login activity
+          try {
+            // Fetch user name for a meaningful description
+            const user = data?.userId
+              ? await prisma.user.findUnique({ where: { id: data.userId }, select: { name: true, role: true } })
+              : null;
+            const displayName = user?.name ?? "Unknown user";
+            const role = user?.role ? ` (${user.role})` : "";
+
+            await prisma.activityLog.create({
+              data: {
+                userId: data?.userId,
+                action: "login",
+                module: "auth",
+                entityType: "Session",
+                entityId: data?.id,
+                description: `${displayName}${role} logged in`,
+                ipAddress: ip.toString(),
+                userAgent: String(ua).substring(0, 200),
+              },
+            });
+          } catch (e) {
+            console.error("[ActivityLog] Failed to log login:", e);
+          }
+
           console.log(
             `[AUDIT] Session created: userId=${data?.userId}, ip=${ip}, ua=${String(ua).substring(0, 50)}`
           );

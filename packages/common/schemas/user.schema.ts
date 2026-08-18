@@ -9,7 +9,7 @@ export const userSchema = z.object({
   email: z.string().email(),
   emailVerified: z.boolean().default(false),
   image: z.string().nullable().optional(),
-  role: z.enum(ALL_ROLES as unknown as [string, ...string[]]).default(ROLES.USER),
+  role: z.enum(ALL_ROLES as unknown as [string, ...string[]]).default(ROLES.STUDENT),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

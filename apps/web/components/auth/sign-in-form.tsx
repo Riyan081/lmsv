@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { authClient } from "@repo/auth/client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import SocialButtons from "./social-buttons";
 
 export default function SignInForm() {
   const [email, setEmail] = useState("");
@@ -32,32 +30,25 @@ export default function SignInForm() {
     );
   };
 
-  const handleSocialSignIn = async (provider: "github" | "google") => {
-    setLoading(true);
-    await authClient.signIn.social({
-      provider,
-      callbackURL: "/dashboard",
-    });
-  };
-
   return (
     <>
       {error && (
-        <div className="alert alert-error">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-5 text-sm bg-red-500/10 border border-red-500/20 text-red-300">
           <span>⚠️</span>
           {error}
         </div>
       )}
 
       <form onSubmit={handleEmailSignIn}>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signin-email">
+        <div className="mb-5">
+          <label className="block text-xs font-medium mb-2" htmlFor="signin-email" style={{ color: "var(--color-text-secondary)" }}>
             Email
           </label>
           <input
             id="signin-email"
             type="email"
-            className="form-input"
+            className="w-full px-4 py-3 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 focus:bg-white/[0.08] transition-all placeholder:text-gray-600"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -65,14 +56,15 @@ export default function SignInForm() {
           />
         </div>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="signin-password">
+        <div className="mb-5">
+          <label className="block text-xs font-medium mb-2" htmlFor="signin-password" style={{ color: "var(--color-text-secondary)" }}>
             Password
           </label>
           <input
             id="signin-password"
             type="password"
-            className="form-input"
+            className="w-full px-4 py-3 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 focus:bg-white/[0.08] transition-all placeholder:text-gray-600"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -82,22 +74,20 @@ export default function SignInForm() {
 
         <button
           type="submit"
-          className="btn btn-primary"
+          className="w-full btn-gradient py-3"
           disabled={loading}
           id="signin-submit-btn"
         >
-          {loading ? <div className="spinner" /> : "Sign In"}
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            "Sign In"
+          )}
         </button>
       </form>
 
-      <div className="divider">
-        <span className="divider-text">Or continue with</span>
-      </div>
-
-      <SocialButtons onSocialAuth={handleSocialSignIn} disabled={loading} />
-
-      <div className="auth-footer">
-        Don&apos;t have an account? <Link href="/sign-up">Sign up</Link>
+      <div className="text-center mt-6 text-xs px-4 py-3 rounded-xl" style={{ color: "var(--color-text-muted)", background: "var(--color-bg-secondary)" }}>
+        Accounts are created by your institution&apos;s administrator. Contact your admin if you don&apos;t have credentials.
       </div>
     </>
   );
