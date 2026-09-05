@@ -15,7 +15,13 @@ export const userManagementService = {
         batch: { select: { id: true, name: true, program: { select: { name: true, code: true } } } },
         section: { select: { id: true, name: true } },
       },
-      orderBy: { name: "asc" },
+      orderBy: [
+        { department: { code: "asc" } },
+        { batch: { startYear: "asc" } },
+        { section: { name: "asc" } },
+        { enrollmentNo: "asc" },
+        { name: "asc" },
+      ],
     });
   },
 

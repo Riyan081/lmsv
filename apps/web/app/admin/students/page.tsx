@@ -3,15 +3,28 @@ import PageHeader from "../../../components/ui/page-header";
 import DataTable from "../../../components/ui/data-table";
 import CreateUserForm from "./create-form";
 import DeleteRowButton from "../../../components/ui/delete-row-button";
+import StudentsClient from "./students-client";
 
-export default async function AdminStudentsPage() {
-  const res = await api.get("/api/users?role=student");
-  const students = res.data || [];
+export default async function AdminStudentsPage({
+  searchParams,
+}: {
+  searchParams?: { sectionId?: string; batchId?: string; departmentId?: string };
+}) {
+  // Build query string from filters
+  const params = new URLSearchParams();
+  params.set("role", "student");
+  if (searchParams?.sectionId) params.set("sectionId", searchParams.sectionId);
+  if (searchParams?.batchId) params.set("batchId", searchParams.batchId);
 
-  const [deptRes, batchRes] = await Promise.all([
+  const [res, deptRes, batchRes] = await Promise.all([
+    api.get(`/api/users?${params.toString()}`),
     api.get("/api/departments"),
-    api.get("/api/batches?includeSections=true"),
+    api.get("/api/batches"),
   ]);
+
+  const students = res.data || [];
+  const departments = deptRes.data || [];
+  const batches = batchRes.data || [];
 
   const columns = [
     {
@@ -35,7 +48,7 @@ export default async function AdminStudentsPage() {
     },
     {
       key: "department",
-      label: "Department",
+      label: "Dept",
       render: (row: any) => (
         <span className="text-xs font-medium px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400">
           {row.department?.code || "—"}
@@ -45,12 +58,23 @@ export default async function AdminStudentsPage() {
     {
       key: "batch",
       label: "Batch",
-      render: (row: any) => row.batch?.name || "—",
+      render: (row: any) => (
+        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {row.batch?.name || "—"}
+        </span>
+      ),
     },
     {
       key: "section",
       label: "Section",
-      render: (row: any) => row.section?.name || "—",
+      render: (row: any) =>
+        row.section ? (
+          <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400">
+            {row.section.name}
+          </span>
+        ) : (
+          <span style={{ color: "var(--color-text-muted)" }}>—</span>
+        ),
     },
     {
       key: "gender",
@@ -86,20 +110,25 @@ export default async function AdminStudentsPage() {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Students"
-        description={`${students.length} enrolled students across all departments.`}
+        description={`${students.length} enrolled students${searchParams?.sectionId || searchParams?.batchId ? " (filtered)" : " across all departments"}.`}
         action={
           <CreateUserForm
             role="student"
-            departments={deptRes.data || []}
-            batches={batchRes.data || []}
+            departments={departments}
+            batches={batches}
           />
         }
       />
-      <DataTable
+
+      {/* Filter bar */}
+      <StudentsClient
+        students={students}
+        departments={departments}
+        batches={batches}
         columns={columns}
-        data={students}
-        emptyMessage="No students yet. Add your first student."
-        emptyIcon="🎓"
+        activeSectionId={searchParams?.sectionId}
+        activeBatchId={searchParams?.batchId}
+        activeDeptId={searchParams?.departmentId}
       />
     </div>
   );

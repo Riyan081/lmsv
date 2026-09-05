@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import CreateSlotForm from "./create-slot-form";
+import AutoGenerateButton from "./auto-generate-button";
 import { useRouter } from "next/navigation";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -26,6 +27,7 @@ interface Slot {
 interface TimetableGridProps {
   slots: Slot[];
   sections: Section[];
+  semesters?: { id: string; label: string; programCode: string }[];
 }
 
 const SUBJECT_COLORS = [
@@ -57,7 +59,7 @@ function formatTime(t: string) {
   return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
 }
 
-export default function TimetableGrid({ slots, sections }: TimetableGridProps) {
+export default function TimetableGrid({ slots, sections, semesters = [] }: TimetableGridProps) {
   const router = useRouter();
   const [selectedSection, setSelectedSection] = useState<string>(sections[0]?.id || "");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -121,7 +123,10 @@ export default function TimetableGrid({ slots, sections }: TimetableGridProps) {
           </select>
         </div>
 
-        <CreateSlotForm onCreated={handleCreated} />
+        <div className="flex items-center gap-2">
+          <AutoGenerateButton sections={sections} semesters={semesters} />
+          <CreateSlotForm onCreated={handleCreated} />
+        </div>
       </div>
 
       {/* Stats */}

@@ -2,10 +2,17 @@ import { api } from "../../../lib/api";
 import PageHeader from "../../../components/ui/page-header";
 import DataTable from "../../../components/ui/data-table";
 import StatusBadge from "../../../components/ui/status-badge";
+import CreateExamForm from "./create-exam-form";
+import EnterMarksForm from "./enter-marks-form";
+import DeleteRowButton from "../../../components/ui/delete-row-button";
 
 export default async function AdminExamsPage() {
-  const res = await api.get("/api/exams?limit=30");
+  const [res, subjectsRes] = await Promise.all([
+    api.get("/api/exams?limit=100"),
+    api.get("/api/subjects"),
+  ]);
   const exams = res.data || [];
+  const subjects = subjectsRes.data || [];
 
   const columns = [
     {
@@ -44,7 +51,7 @@ export default async function AdminExamsPage() {
       label: "Date",
       render: (row: any) => (
         <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {new Date(row.date).toLocaleDateString()}
+          {new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
         </span>
       ),
     },
@@ -52,17 +59,39 @@ export default async function AdminExamsPage() {
       key: "_count",
       label: "Results",
       render: (row: any) => (
-        <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        <span className={`text-sm font-medium ${row._count?.results > 0 ? "text-emerald-400" : ""}`} style={row._count?.results === 0 ? { color: "var(--color-text-muted)" } : {}}>
           {row._count?.results ?? 0} entered
         </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (row: any) => (
+        <div className="flex items-center gap-2">
+          <EnterMarksForm exam={row} />
+          <DeleteRowButton
+            url={`http://localhost:3001/api/exams/${row.id}`}
+            label={`exam "${row.name}"`}
+          />
+        </div>
       ),
     },
   ];
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Exams" description="View and manage all examinations." />
-      <DataTable columns={columns} data={exams} emptyMessage="No exams created yet." emptyIcon="📝" />
+      <PageHeader
+        title="Exams"
+        description={`${exams.length} exam${exams.length !== 1 ? "s" : ""} — create exams and enter student marks.`}
+        action={<CreateExamForm subjects={subjects} />}
+      />
+      <DataTable
+        columns={columns}
+        data={exams}
+        emptyMessage="No exams created yet. Create your first exam."
+        emptyIcon="📝"
+      />
     </div>
   );
 }

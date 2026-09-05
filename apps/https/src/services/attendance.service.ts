@@ -80,7 +80,16 @@ export const attendanceService = {
       prisma.attendance.findMany({
         where,
         include: {
-          student: { select: { id: true, name: true, enrollmentNo: true } },
+          student: {
+            select: {
+              id: true,
+              name: true,
+              enrollmentNo: true,
+              section: { select: { id: true, name: true } },
+              batch: { select: { id: true, name: true } },
+              department: { select: { id: true, name: true, code: true } },
+            },
+          },
           subject: { select: { id: true, name: true, code: true } },
           markedBy: { select: { id: true, name: true } },
         },

@@ -54,7 +54,7 @@ export const examController = {
 
   update: async (req: Request, res: Response) => {
     const user = (req as any).user;
-    const exam = await examService.update(req.params.id, req.body);
+    const exam = await examService.update(req.params.id as string, req.body);
     await logActivity({
       userId: user.id, action: "update", module: "exam",
       entityType: "Exam", entityId: exam.id,
@@ -66,10 +66,10 @@ export const examController = {
 
   delete: async (req: Request, res: Response) => {
     const user = (req as any).user;
-    await examService.delete(req.params.id);
+    await examService.delete(req.params.id as string);
     await logActivity({
       userId: user.id, action: "delete", module: "exam",
-      entityType: "Exam", entityId: req.params.id,
+      entityType: "Exam", entityId: req.params.id as string,
       description: `Deleted exam ${req.params.id}`,
       ipAddress: req.ip, userAgent: req.headers["user-agent"],
     });

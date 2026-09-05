@@ -84,7 +84,7 @@ export default async function AdminBatchesPage() {
       <PageHeader
         title="Batches"
         description={`${batches.length} batches across all programs.`}
-        action={<CreateBatchForm programs={programs} />}
+        action={<CreateBatchForm programs={programs} batches={batches} />}
       />
       <DataTable
         columns={columns}

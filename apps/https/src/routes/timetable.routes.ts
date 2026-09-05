@@ -22,4 +22,7 @@ router.post("/bulk", requireRole("admin"), validate(bulkCreateTimetableSchema), 
 router.put("/:id", requireRole("admin"), asyncHandler(timetableController.updateSlot));
 router.delete("/:id", requireRole("admin"), asyncHandler(timetableController.deleteSlot));
 
+// Admin-only: auto-generate timetable using constraint solver
+router.post("/auto-generate", requireRole("admin"), asyncHandler(timetableController.autoGenerate));
+
 export default router;

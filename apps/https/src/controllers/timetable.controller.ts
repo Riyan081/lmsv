@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { timetableService } from "../services/timetable.service.js";
+import { timetableGeneratorService } from "../services/timetable-generator.service.js";
 import { sendSuccess } from "../utils/response.js";
 import { logActivity } from "../middleware/activity-logger.js";
 
@@ -62,5 +63,44 @@ export const timetableController = {
   deleteSlot: async (req: Request, res: Response) => {
     await timetableService.deleteSlot(req.params.id as string);
     sendSuccess(res, "Timetable slot deleted");
+  },
+
+  /** POST /api/timetable/auto-generate */
+  autoGenerate: async (req: Request, res: Response) => {
+    const { sectionId, semesterId, clearExisting = false } = req.body;
+
+    if (!sectionId || !semesterId) {
+      res.status(400).json({ success: false, error: "sectionId and semesterId are required" });
+      return;
+    }
+
+    const result = await timetableGeneratorService.generateAndSave(
+      sectionId,
+      semesterId,
+      { clearExisting }
+    );
+
+    if (!result.success) {
+      res.status(422).json({
+        success: false,
+        error: result.error,
+        warnings: result.warnings,
+      });
+      return;
+    }
+
+    await logActivity({
+      userId: (req as any).user?.id,
+      action: "create",
+      module: "timetable",
+      description: `Auto-generated ${result.created} timetable slots for section`,
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    sendSuccess(res, `Auto-generated ${result.created} timetable slots`, {
+      created: result.created,
+      warnings: result.warnings,
+    }, 201);
   },
 };

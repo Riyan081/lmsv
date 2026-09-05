@@ -5,12 +5,16 @@ import CreateSubjectForm from "./create-form";
 import DeleteRowButton from "../../../components/ui/delete-row-button";
 
 export default async function AdminSubjectsPage() {
-  const [res, deptRes] = await Promise.all([
+  const [res, deptRes, facultyRes, batchRes] = await Promise.all([
     api.get("/api/subjects"),
     api.get("/api/departments"),
+    api.get("/api/users?role=faculty"),
+    api.get("/api/batches"),
   ]);
   const subjects = res.data || [];
   const departments = deptRes.data || [];
+  const faculty = facultyRes.data || [];
+  const batches = batchRes.data || [];
 
   const columns = [
     {
@@ -92,7 +96,7 @@ export default async function AdminSubjectsPage() {
       <PageHeader
         title="Subjects"
         description={`${subjects.length} subjects across all departments.`}
-        action={<CreateSubjectForm departments={departments} />}
+        action={<CreateSubjectForm departments={departments} faculty={faculty} batches={batches} />}
       />
       <DataTable
         columns={columns}

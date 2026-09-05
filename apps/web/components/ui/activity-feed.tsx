@@ -62,7 +62,10 @@ export default function ActivityFeed({ items, maxItems = 20 }: ActivityFeedProps
           Recent Activity
         </h3>
       </div>
-      <div className="divide-y" style={{ borderColor: "var(--color-border)" }}>
+      <div
+        className="divide-y overflow-y-auto"
+        style={{ borderColor: "var(--color-border)", maxHeight: "400px" }}
+      >
         {displayed.length === 0 ? (
           <div className="px-5 py-8 text-center">
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -83,11 +86,9 @@ export default function ActivityFeed({ items, maxItems = 20 }: ActivityFeedProps
                   {item.description}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  {item.user && (
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      {item.user.name}
-                    </span>
-                  )}
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    {item.user?.name || "System"}
+                  </span>
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${MODULE_COLORS[item.module] || "text-gray-400"}`}>
                     {item.module}
                   </span>

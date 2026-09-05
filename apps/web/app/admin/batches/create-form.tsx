@@ -10,11 +10,19 @@ interface Program {
   durationYears: number;
 }
 
-interface CreateBatchFormProps {
-  programs: Program[];
+interface Batch {
+  id: string;
+  name: string;
+  program?: { code: string; name: string };
+  sections?: { name: string }[];
 }
 
-export default function CreateBatchForm({ programs }: CreateBatchFormProps) {
+interface CreateBatchFormProps {
+  programs: Program[];
+  batches: Batch[];
+}
+
+export default function CreateBatchForm({ programs, batches }: CreateBatchFormProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"batch" | "section">("batch");
   const [loading, setLoading] = useState(false);
@@ -210,17 +218,26 @@ export default function CreateBatchForm({ programs }: CreateBatchFormProps) {
         {tab === "section" && (
           <form onSubmit={handleSectionSubmit} className="space-y-4">
             <div>
-              <label className={labelCls} style={labelStyle}>Batch ID *</label>
-              <input
+              <label className={labelCls} style={labelStyle}>Batch *</label>
+              <select
                 name="batchId"
                 required
-                placeholder="Paste batch ID from the table..."
                 className={inputCls}
                 style={inputStyle}
-              />
-              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                Copy the batch ID from the Batches table above.
-              </p>
+              >
+                <option value="">Select batch...</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}{b.program ? ` (${b.program.code})` : ""}
+                    {b.sections && b.sections.length > 0
+                      ? ` — Sections: ${b.sections.map((s) => s.name).join(", ")}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              {batches.length === 0 && (
+                <p className="text-xs mt-1 text-amber-400">No batches yet. Create a batch first.</p>
+              )}
             </div>
             <div>
               <label className={labelCls} style={labelStyle}>Section Name *</label>
