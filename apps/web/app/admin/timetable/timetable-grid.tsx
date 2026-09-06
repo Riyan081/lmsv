@@ -11,6 +11,7 @@ const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 interface Section {
   id: string;
   label: string;
+  programCode?: string;
 }
 
 interface Slot {

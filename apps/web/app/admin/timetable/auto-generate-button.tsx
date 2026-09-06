@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 interface Section {
   id: string;
   label: string;
+  programCode?: string;
 }
 
 interface Semester {
@@ -33,7 +34,44 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
   const [warnings, setWarnings] = useState<string[]>([]);
   const [result, setResult] = useState<{ created: number } | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
   const router = useRouter();
+
+  const currentSection = sections.find((s) => s.id === selectedSectionId);
+  const filteredSemesters = selectedSectionId && currentSection?.programCode
+    ? semesters.filter((sem) => sem.programCode.toUpperCase() === currentSection.programCode.toUpperCase())
+    : semesters;
+
+  const handleSectionChange = (sectionId: string) => {
+    setSelectedSectionId(sectionId);
+    const targetSection = sections.find((s) => s.id === sectionId);
+    const validSems = sectionId && targetSection?.programCode
+      ? semesters.filter((sem) => sem.programCode.toUpperCase() === targetSection.programCode.toUpperCase())
+      : semesters;
+
+    if (!validSems.some((s) => s.id === selectedSemesterId)) {
+      setSelectedSemesterId("");
+    }
+  };
+
+  const handleOpenModal = () => {
+    setOpen(true);
+    setError("");
+    setWarnings([]);
+    setResult(null);
+    if (!selectedSectionId && sections.length > 0) {
+      const initialSectionId = sections[0]?.id || "";
+      setSelectedSectionId(initialSectionId);
+      const initialSection = sections[0];
+      const validSems = initialSection?.programCode
+        ? semesters.filter((sem) => sem.programCode.toUpperCase() === initialSection.programCode.toUpperCase())
+        : semesters;
+      if (validSems.length > 0) {
+        setSelectedSemesterId(validSems[0]!.id);
+      }
+    }
+  };
 
   const handleGenerate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -42,9 +80,14 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
     setWarnings([]);
     setResult(null);
 
-    const form = new FormData(e.currentTarget);
-    const sectionId = form.get("sectionId") as string;
-    const semesterId = form.get("semesterId") as string;
+    const sectionId = selectedSectionId;
+    const semesterId = selectedSemesterId;
+
+    if (!sectionId || !semesterId) {
+      setError("Please select both a section and a semester.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("http://localhost:3001/api/timetable/auto-generate", {
@@ -84,7 +127,7 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpenModal}
         className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all hover:bg-purple-500/10 hover:border-purple-500/30"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
       >
@@ -163,7 +206,14 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
           <form onSubmit={handleGenerate} className="space-y-4">
             <div>
               <label className={labelCls} style={labelStyle}>Section *</label>
-              <select name="sectionId" required className={inputCls} style={inputStyle}>
+              <select
+                name="sectionId"
+                required
+                value={selectedSectionId}
+                onChange={(e) => handleSectionChange(e.target.value)}
+                className={inputCls}
+                style={inputStyle}
+              >
                 <option value="">Select section...</option>
                 {sections.map((s) => (
                   <option key={s.id} value={s.id}>{s.label}</option>
@@ -175,10 +225,22 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
             </div>
 
             <div>
-              <label className={labelCls} style={labelStyle}>Semester *</label>
-              <select name="semesterId" required className={inputCls} style={inputStyle}>
-                <option value="">Select semester...</option>
-                {semesters.map((s) => (
+              <label className={labelCls} style={labelStyle}>
+                Semester * {currentSection?.programCode && <span className="text-purple-400 font-normal">({currentSection.programCode})</span>}
+              </label>
+              <select
+                name="semesterId"
+                required
+                value={selectedSemesterId}
+                onChange={(e) => setSelectedSemesterId(e.target.value)}
+                className={inputCls}
+                style={inputStyle}
+                disabled={!selectedSectionId}
+              >
+                <option value="">
+                  {!selectedSectionId ? "Select a section first..." : filteredSemesters.length === 0 ? "No semesters found" : "Select semester..."}
+                </option>
+                {filteredSemesters.map((s) => (
                   <option key={s.id} value={s.id}>{s.label}</option>
                 ))}
               </select>

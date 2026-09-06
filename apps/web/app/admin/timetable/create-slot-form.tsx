@@ -43,6 +43,8 @@ export default function CreateSlotForm({ onCreated }: CreateSlotFormProps) {
   const [facultyList, setFacultyList] = useState<Faculty[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
 
   useEffect(() => {
     if (!open || dataLoaded) return;
@@ -64,17 +66,32 @@ export default function CreateSlotForm({ onCreated }: CreateSlotFormProps) {
       setFacultyList(facultyData.data || []);
 
       // Get semesters from programs
-      const semesterPromises = (programData.data || []).map((p: any) =>
-        fetch(`http://localhost:3001/api/programs/${p.id}`, { credentials: "include" })
-          .then((r) => r.json())
-          .then((pd) => (pd.data?.semesters || []).map((s: any) => ({ ...s, program: { code: p.code } })))
-      );
-      Promise.all(semesterPromises).then((nested) => {
-        setSemesters(nested.flat().sort((a, b) => a.number - b.number));
+      const allSemesters: Semester[] = [];
+      (programData.data || []).forEach((p: any) => {
+        (p.semesters || []).forEach((s: any) => {
+          allSemesters.push({ id: s.id, number: s.number, program: { code: p.code } });
+        });
       });
+      setSemesters(allSemesters.sort((a, b) => a.number - b.number));
       setDataLoaded(true);
     });
   }, [open, dataLoaded]);
+
+  const currentSection = sections.find((s) => s.id === selectedSectionId);
+  const filteredSemesters = selectedSectionId && currentSection?.batch?.program?.code
+    ? semesters.filter((sem) => sem.program.code.toUpperCase() === currentSection.batch?.program?.code?.toUpperCase())
+    : semesters;
+
+  const handleSectionChange = (sectionId: string) => {
+    setSelectedSectionId(sectionId);
+    const targetSection = sections.find((s) => s.id === sectionId);
+    const validSems = sectionId && targetSection?.batch?.program?.code
+      ? semesters.filter((sem) => sem.program.code.toUpperCase() === targetSection.batch?.program?.code?.toUpperCase())
+      : semesters;
+    if (!validSems.some((s) => s.id === selectedSemesterId)) {
+      setSelectedSemesterId("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -89,8 +106,8 @@ export default function CreateSlotForm({ onCreated }: CreateSlotFormProps) {
       room: (form.get("room") as string) || undefined,
       subjectId: form.get("subjectId") as string,
       facultyId: form.get("facultyId") as string,
-      sectionId: form.get("sectionId") as string,
-      semesterId: form.get("semesterId") as string,
+      sectionId: selectedSectionId,
+      semesterId: selectedSemesterId,
     };
 
     try {
@@ -173,7 +190,14 @@ export default function CreateSlotForm({ onCreated }: CreateSlotFormProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls} style={labelStyle}>Section *</label>
-              <select name="sectionId" required className={inputCls} style={inputStyle}>
+              <select
+                name="sectionId"
+                required
+                value={selectedSectionId}
+                onChange={(e) => handleSectionChange(e.target.value)}
+                className={inputCls}
+                style={inputStyle}
+              >
                 <option value="">Select section...</option>
                 {sections.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -183,10 +207,22 @@ export default function CreateSlotForm({ onCreated }: CreateSlotFormProps) {
               </select>
             </div>
             <div>
-              <label className={labelCls} style={labelStyle}>Semester *</label>
-              <select name="semesterId" required className={inputCls} style={inputStyle}>
-                <option value="">Select semester...</option>
-                {semesters.map((s) => (
+              <label className={labelCls} style={labelStyle}>
+                Semester * {currentSection?.batch?.program?.code && <span className="text-purple-400 font-normal">({currentSection.batch.program.code})</span>}
+              </label>
+              <select
+                name="semesterId"
+                required
+                value={selectedSemesterId}
+                onChange={(e) => setSelectedSemesterId(e.target.value)}
+                className={inputCls}
+                style={inputStyle}
+                disabled={!selectedSectionId}
+              >
+                <option value="">
+                  {!selectedSectionId ? "Select section first..." : filteredSemesters.length === 0 ? "No semesters found" : "Select semester..."}
+                </option>
+                {filteredSemesters.map((s) => (
                   <option key={s.id} value={s.id}>Sem {s.number} ({s.program.code})</option>
                 ))}
               </select>

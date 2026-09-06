@@ -3,6 +3,9 @@
  * UNIVERSITY LMS — FULL REALISTIC SEED
  * ═══════════════════════════════════════════════════════════════════
  *
+ * 3 Departments: Computer Engineering (CMPN), IT, AI & Data Science
+ * Realistic Indian engineering college data
+ *
  * Usage:
  *   $env:DATABASE_URL='postgresql://postgres:mysecretpassword@localhost:5432/postgres'
  *   $env:BETTER_AUTH_SECRET='supersecretkey123'
@@ -22,19 +25,15 @@ import {
   ApprovalStatus,
   ExamType,
   AcademicEventType,
-  ComplaintCategory,
-  ComplaintStatus,
   ActivityAction,
   ActivityModule,
   Grade,
   Gender,
 } from "@prisma/client";
 
-// Use Better Auth's own API to create users — guarantees correct password hash
 import { auth } from "../../auth/src/auth";
 
 const prisma = new PrismaClient();
-
 const PASSWORD = "password123";
 
 // ─── Helper: create user via Better Auth API, then update profile ──
@@ -55,24 +54,14 @@ async function createUser(data: {
   batchId?: string;
   sectionId?: string;
 }) {
-  // Check if user already exists
   let user = await prisma.user.findUnique({ where: { email: data.email } });
 
   if (!user) {
-    // Use Better Auth's signUpEmail API — this creates user + account with proper hash
     const result = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: PASSWORD,
-        name: data.name,
-      },
+      body: { email: data.email, password: PASSWORD, name: data.name },
     });
+    if (!result?.user) throw new Error(`Failed to create user: ${data.email}`);
 
-    if (!result?.user) {
-      throw new Error(`Failed to create user: ${data.email}`);
-    }
-
-    // Update the user with all the extra LMS fields
     user = await prisma.user.update({
       where: { id: result.user.id },
       data: {
@@ -97,201 +86,234 @@ async function createUser(data: {
 }
 
 async function main() {
-  console.log("🌱 Seeding University LMS with realistic data...\n");
+  console.log("🌱 Seeding University LMS — 3 Departments (CMPN, IT, AI)...\n");
 
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // CLEAN — Delete all existing data in correct order
+  // ══════════════════════════════════════════════════════════════════
+  console.log("🗑️  Cleaning existing data...");
+  await prisma.activityLog.deleteMany();
+  await prisma.announcement.deleteMany();
+  await prisma.hostelComplaint.deleteMany();
+  await prisma.gatePass.deleteMany();
+  await prisma.hostelAllocation.deleteMany();
+  await prisma.hostelRoom.deleteMany();
+  await prisma.hostel.deleteMany();
+  await prisma.result.deleteMany();
+  await prisma.exam.deleteMany();
+  await prisma.attendance.deleteMany();
+  await prisma.leaveApplication.deleteMany();
+  await prisma.timetableSlot.deleteMany();
+  await prisma.facultySubject.deleteMany();
+  await prisma.subject.deleteMany();
+  await prisma.academicEvent.deleteMany();
+  await prisma.semester.deleteMany();
+  await prisma.section.deleteMany();
+  await prisma.batch.deleteMany();
+  await prisma.program.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.department.deleteMany();
+  console.log("  ✅ All data cleared\n");
+
+  // ══════════════════════════════════════════════════════════════════
   // 1. DEPARTMENTS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("📚 Creating departments...");
+  // ══════════════════════════════════════════════════════════════════
+  console.log("📚 Creating 3 departments...");
 
   const deptData = [
-    { id: "dept-cse", name: "Computer Science & Engineering",       code: "CSE", description: "Department of Computer Science & Engineering" },
-    { id: "dept-me",  name: "Mechanical Engineering",               code: "ME",  description: "Department of Mechanical Engineering" },
-    { id: "dept-ece", name: "Electronics & Communication Engineering", code: "ECE", description: "Department of Electronics & Communication" },
-    { id: "dept-ce",  name: "Civil Engineering",                    code: "CE",  description: "Department of Civil Engineering" },
-    { id: "dept-ee",  name: "Electrical Engineering",               code: "EE",  description: "Department of Electrical Engineering" },
+    { id: "dept-cmpn", name: "Computer Engineering",         code: "CMPN", description: "Department of Computer Engineering — Core CS, Systems, Software" },
+    { id: "dept-it",   name: "Information Technology",        code: "IT",   description: "Department of Information Technology — Web, Cloud, Security" },
+    { id: "dept-ai",   name: "AI & Data Science",            code: "AIDS", description: "Department of Artificial Intelligence & Data Science" },
   ];
 
   const depts: Record<string, any> = {};
   for (const d of deptData) {
-    depts[d.code] = await prisma.department.upsert({
-      where: { code: d.code },
-      update: {},
-      create: d,
-    });
+    depts[d.code] = await prisma.department.create({ data: d });
     console.log(`  ✅ ${d.code} — ${d.name}`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 2. PROGRAMS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 2. PROGRAMS (B.Tech 4yr for each dept)
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n🎓 Creating programs...");
 
   const progData = [
-    { id: "prog-btech-cse", name: "B.Tech CSE", code: "BTECH-CSE", durationYears: 4, totalSemesters: 8, departmentId: depts.CSE.id },
-    { id: "prog-btech-me",  name: "B.Tech ME",  code: "BTECH-ME",  durationYears: 4, totalSemesters: 8, departmentId: depts.ME.id },
-    { id: "prog-btech-ece", name: "B.Tech ECE", code: "BTECH-ECE", durationYears: 4, totalSemesters: 8, departmentId: depts.ECE.id },
-    { id: "prog-btech-ce",  name: "B.Tech CE",  code: "BTECH-CE",  durationYears: 4, totalSemesters: 8, departmentId: depts.CE.id },
-    { id: "prog-btech-ee",  name: "B.Tech EE",  code: "BTECH-EE",  durationYears: 4, totalSemesters: 8, departmentId: depts.EE.id },
+    { id: "prog-btech-cmpn", name: "B.Tech Computer Engineering",  code: "BTECH-CMPN", durationYears: 4, totalSemesters: 8, departmentId: depts.CMPN.id },
+    { id: "prog-btech-it",   name: "B.Tech Information Technology", code: "BTECH-IT",   durationYears: 4, totalSemesters: 8, departmentId: depts.IT.id },
+    { id: "prog-btech-ai",   name: "B.Tech AI & Data Science",     code: "BTECH-AIDS", durationYears: 4, totalSemesters: 8, departmentId: depts.AIDS.id },
   ];
 
   const progs: Record<string, any> = {};
   for (const p of progData) {
-    progs[p.code] = await prisma.program.upsert({
-      where: { code: p.code },
-      update: {},
-      create: p,
-    });
+    progs[p.code] = await prisma.program.create({ data: p });
     console.log(`  ✅ ${p.name}`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 3. BATCHES
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 3. BATCHES (2023-2027 and 2024-2028 for each)
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n📅 Creating batches...");
 
   const batchData = [
-    { id: "batch-cse-2023", name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-CSE"].id },
-    { id: "batch-cse-2024", name: "2024-2028", startYear: 2024, endYear: 2028, programId: progs["BTECH-CSE"].id },
-    { id: "batch-me-2023",  name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-ME"].id },
-    { id: "batch-ece-2023", name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-ECE"].id },
-    { id: "batch-ce-2023",  name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-CE"].id },
-    { id: "batch-ee-2024",  name: "2024-2028", startYear: 2024, endYear: 2028, programId: progs["BTECH-EE"].id },
+    { id: "batch-cmpn-23", name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-CMPN"].id },
+    { id: "batch-cmpn-24", name: "2024-2028", startYear: 2024, endYear: 2028, programId: progs["BTECH-CMPN"].id },
+    { id: "batch-it-23",   name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-IT"].id },
+    { id: "batch-it-24",   name: "2024-2028", startYear: 2024, endYear: 2028, programId: progs["BTECH-IT"].id },
+    { id: "batch-ai-23",   name: "2023-2027", startYear: 2023, endYear: 2027, programId: progs["BTECH-AIDS"].id },
+    { id: "batch-ai-24",   name: "2024-2028", startYear: 2024, endYear: 2028, programId: progs["BTECH-AIDS"].id },
   ];
 
   const batches: Record<string, any> = {};
   for (const b of batchData) {
-    batches[b.id] = await prisma.batch.upsert({
-      where: { id: b.id },
-      update: {},
-      create: b,
-    });
+    batches[b.id] = await prisma.batch.create({ data: b });
     console.log(`  ✅ ${b.name} (${b.id})`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 4. SECTIONS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 4. SECTIONS (A and B per batch)
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n🏫 Creating sections...");
 
   const sectionData = [
-    { id: "sec-cse23-A", name: "A", batchId: batches["batch-cse-2023"].id },
-    { id: "sec-cse23-B", name: "B", batchId: batches["batch-cse-2023"].id },
-    { id: "sec-cse24-A", name: "A", batchId: batches["batch-cse-2024"].id },
-    { id: "sec-me23-A",  name: "A", batchId: batches["batch-me-2023"].id },
-    { id: "sec-ece23-A", name: "A", batchId: batches["batch-ece-2023"].id },
-    { id: "sec-ce23-A",  name: "A", batchId: batches["batch-ce-2023"].id },
-    { id: "sec-ee24-A",  name: "A", batchId: batches["batch-ee-2024"].id },
+    { id: "sec-cmpn23-A", name: "A", batchId: batches["batch-cmpn-23"].id },
+    { id: "sec-cmpn23-B", name: "B", batchId: batches["batch-cmpn-23"].id },
+    { id: "sec-cmpn24-A", name: "A", batchId: batches["batch-cmpn-24"].id },
+    { id: "sec-it23-A",   name: "A", batchId: batches["batch-it-23"].id },
+    { id: "sec-it23-B",   name: "B", batchId: batches["batch-it-23"].id },
+    { id: "sec-it24-A",   name: "A", batchId: batches["batch-it-24"].id },
+    { id: "sec-ai23-A",   name: "A", batchId: batches["batch-ai-23"].id },
+    { id: "sec-ai24-A",   name: "A", batchId: batches["batch-ai-24"].id },
   ];
 
   const sections: Record<string, any> = {};
   for (const s of sectionData) {
-    sections[s.id] = await prisma.section.upsert({
-      where: { id: s.id },
-      update: {},
-      create: s,
-    });
+    sections[s.id] = await prisma.section.create({ data: s });
     console.log(`  ✅ Section ${s.name} (${s.id})`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 5. SEMESTERS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 5. SEMESTERS (1-8 for each program, current = 5)
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n📖 Creating semesters...");
 
   const semesters: Record<string, any> = {};
   for (const prog of Object.values(progs)) {
     for (let i = 1; i <= 8; i++) {
       const key = `${prog.code}-sem${i}`;
-      const existing = await prisma.semester.findFirst({
-        where: { number: i, programId: prog.id },
-      });
-      semesters[key] = existing ?? await prisma.semester.create({
+      semesters[key] = await prisma.semester.create({
         data: { number: i, programId: prog.id, isCurrent: i === 5 },
       });
     }
   }
-  console.log("  ✅ Semesters 1-8 for all programs (current: 5th)");
+  console.log("  ✅ Semesters 1-8 for all 3 programs (current: Sem 5)");
 
-  // ═══════════════════════════════════════════════════════════════
-  // 6. SUBJECTS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 6. SUBJECTS — Realistic Mumbai Univ style subjects
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n📝 Creating subjects...");
 
   const subjectData = [
-    // CSE Semester 5
-    { id: "sub-cs501", name: "Data Structures & Algorithms",       code: "CS501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs502", name: "Operating Systems",                  code: "CS502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs503", name: "Database Management Systems",        code: "CS503", credits: 3, type: SubjectType.theory,    semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs504", name: "Computer Networks",                  code: "CS504", credits: 3, type: SubjectType.theory,    semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs505", name: "Software Engineering",               code: "CS505", credits: 3, type: SubjectType.theory,    semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs591", name: "DSA Lab",                            code: "CS591", credits: 2, type: SubjectType.practical, semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs592", name: "DBMS Lab",                           code: "CS592", credits: 2, type: SubjectType.practical, semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    { id: "sub-cs506", name: "Machine Learning Elective",          code: "CS506", credits: 3, type: SubjectType.elective,  semKey: "BTECH-CSE-sem5", deptCode: "CSE" },
-    // ME Semester 5
-    { id: "sub-me501", name: "Thermodynamics II",                  code: "ME501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-ME-sem5",  deptCode: "ME" },
-    { id: "sub-me502", name: "Fluid Mechanics",                    code: "ME502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-ME-sem5",  deptCode: "ME" },
-    { id: "sub-me503", name: "Manufacturing Processes",            code: "ME503", credits: 3, type: SubjectType.theory,    semKey: "BTECH-ME-sem5",  deptCode: "ME" },
-    { id: "sub-me504", name: "Theory of Machines",                 code: "ME504", credits: 3, type: SubjectType.theory,    semKey: "BTECH-ME-sem5",  deptCode: "ME" },
-    { id: "sub-me591", name: "Thermal Lab",                        code: "ME591", credits: 2, type: SubjectType.practical, semKey: "BTECH-ME-sem5",  deptCode: "ME" },
-    // ECE Semester 5
-    { id: "sub-ec501", name: "Digital Signal Processing",          code: "EC501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-ECE-sem5", deptCode: "ECE" },
-    { id: "sub-ec502", name: "VLSI Design",                       code: "EC502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-ECE-sem5", deptCode: "ECE" },
-    { id: "sub-ec503", name: "Microprocessors & Microcontrollers", code: "EC503", credits: 3, type: SubjectType.theory,    semKey: "BTECH-ECE-sem5", deptCode: "ECE" },
-    { id: "sub-ec504", name: "Antenna & Wave Propagation",         code: "EC504", credits: 3, type: SubjectType.theory,    semKey: "BTECH-ECE-sem5", deptCode: "ECE" },
-    { id: "sub-ec591", name: "DSP Lab",                            code: "EC591", credits: 2, type: SubjectType.practical, semKey: "BTECH-ECE-sem5", deptCode: "ECE" },
-    // CE Semester 5
-    { id: "sub-ce501", name: "Structural Analysis",                code: "CE501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CE-sem5",  deptCode: "CE" },
-    { id: "sub-ce502", name: "Geotechnical Engineering",           code: "CE502", credits: 3, type: SubjectType.theory,    semKey: "BTECH-CE-sem5",  deptCode: "CE" },
-    { id: "sub-ce503", name: "Environmental Engineering",          code: "CE503", credits: 3, type: SubjectType.theory,    semKey: "BTECH-CE-sem5",  deptCode: "CE" },
-    // EE Semester 5
-    { id: "sub-ee501", name: "Power Systems",                     code: "EE501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-EE-sem5",  deptCode: "EE" },
-    { id: "sub-ee502", name: "Control Systems",                   code: "EE502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-EE-sem5",  deptCode: "EE" },
-    { id: "sub-ee503", name: "Electrical Machines",               code: "EE503", credits: 3, type: SubjectType.theory,    semKey: "BTECH-EE-sem5",  deptCode: "EE" },
+    // ── CMPN Semester 5 (3rd year, Sem 1) ──
+    { id: "sub-cmpn501", name: "Data Structures & Algorithms",  code: "CMPN501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn502", name: "Operating Systems",             code: "CMPN502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn503", name: "Database Management Systems",   code: "CMPN503", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn504", name: "Computer Networks",             code: "CMPN504", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn505", name: "Software Engineering",          code: "CMPN505", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn591", name: "DSA Lab",                       code: "CMPN591", credits: 2, type: SubjectType.practical, semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+    { id: "sub-cmpn592", name: "DBMS Lab",                      code: "CMPN592", credits: 2, type: SubjectType.practical, semKey: "BTECH-CMPN-sem5", deptCode: "CMPN" },
+
+    // ── CMPN Semester 3 (2nd year, Sem 1) — for 2024 batch ──
+    { id: "sub-cmpn301", name: "Engineering Mathematics III",    code: "CMPN301", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn302", name: "Digital Logic Design",           code: "CMPN302", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn303", name: "Discrete Mathematics",           code: "CMPN303", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn304", name: "Electronic Devices & Circuits",  code: "CMPN304", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn305", name: "Data Structures",                code: "CMPN305", credits: 4, type: SubjectType.theory,    semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn391", name: "Digital Logic Lab",              code: "CMPN391", credits: 2, type: SubjectType.practical, semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+    { id: "sub-cmpn392", name: "DS Lab",                         code: "CMPN392", credits: 2, type: SubjectType.practical, semKey: "BTECH-CMPN-sem3", deptCode: "CMPN" },
+
+    // ── IT Semester 5 ──
+    { id: "sub-it501", name: "Web Development",                 code: "IT501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem5", deptCode: "IT" },
+    { id: "sub-it502", name: "Information Security",            code: "IT502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem5", deptCode: "IT" },
+    { id: "sub-it503", name: "Cloud Computing",                 code: "IT503", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem5", deptCode: "IT" },
+    { id: "sub-it504", name: "Data Warehousing & Mining",       code: "IT504", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem5", deptCode: "IT" },
+    { id: "sub-it505", name: "Mobile Application Development",  code: "IT505", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem5", deptCode: "IT" },
+    { id: "sub-it591", name: "Web Dev Lab",                     code: "IT591", credits: 2, type: SubjectType.practical, semKey: "BTECH-IT-sem5", deptCode: "IT" },
+
+    // ── IT Semester 3 (2nd year, Sem 1) — for 2024 batch ──
+    { id: "sub-it301", name: "Engineering Mathematics III",      code: "IT301", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it302", name: "Data Structures",                  code: "IT302", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it303", name: "Digital Logic Design",             code: "IT303", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it304", name: "Discrete Mathematics",             code: "IT304", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it305", name: "Computer Organization",            code: "IT305", credits: 4, type: SubjectType.theory,    semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it391", name: "DS Lab",                           code: "IT391", credits: 2, type: SubjectType.practical, semKey: "BTECH-IT-sem3", deptCode: "IT" },
+    { id: "sub-it392", name: "Digital Logic Lab",                code: "IT392", credits: 2, type: SubjectType.practical, semKey: "BTECH-IT-sem3", deptCode: "IT" },
+
+    // ── AI & DS Semester 5 ──
+    { id: "sub-ai501", name: "Machine Learning",                code: "AI501", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+    { id: "sub-ai502", name: "Natural Language Processing",     code: "AI502", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+    { id: "sub-ai503", name: "Deep Learning",                   code: "AI503", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+    { id: "sub-ai504", name: "Big Data Analytics",              code: "AI504", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+    { id: "sub-ai505", name: "Computer Vision",                 code: "AI505", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+    { id: "sub-ai591", name: "ML Lab",                          code: "AI591", credits: 2, type: SubjectType.practical, semKey: "BTECH-AIDS-sem5", deptCode: "AIDS" },
+
+    // ── AI & DS Semester 3 (2nd year, Sem 1) — for 2024 batch ──
+    { id: "sub-ai301", name: "Engineering Mathematics III",      code: "AI301", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai302", name: "Data Structures & Algorithms",     code: "AI302", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai303", name: "Probability & Statistics",         code: "AI303", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai304", name: "Digital Logic Design",             code: "AI304", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai305", name: "Python Programming",              code: "AI305", credits: 4, type: SubjectType.theory,    semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai391", name: "Python Lab",                       code: "AI391", credits: 2, type: SubjectType.practical, semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
+    { id: "sub-ai392", name: "DS Lab",                           code: "AI392", credits: 2, type: SubjectType.practical, semKey: "BTECH-AIDS-sem3", deptCode: "AIDS" },
   ];
 
   const subjects: Record<string, any> = {};
   for (const s of subjectData) {
-    subjects[s.code] = await prisma.subject.upsert({
-      where: { code: s.code },
-      update: {},
-      create: {
+    subjects[s.code] = await prisma.subject.create({
+      data: {
         id: s.id, name: s.name, code: s.code, credits: s.credits, type: s.type,
         semesterId: semesters[s.semKey].id, departmentId: depts[s.deptCode].id,
       },
     });
-    console.log(`  ✅ ${s.code} — ${s.name}`);
+    console.log(`  ✅ ${s.code} — ${s.name} (${s.credits} cr)`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 7. USERS — ADMINS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n👑 Creating admin accounts...");
+  // ══════════════════════════════════════════════════════════════════
+  // 7. USERS — ADMIN
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n👑 Creating admin...");
+  const admin = await createUser({ id: "user-admin-1", email: "admin@college.com", name: "Dr. Rajesh Kumar", role: "admin", phone: "9876543210", gender: Gender.male, employeeId: "ADM001", departmentId: depts.CMPN.id });
+  console.log("  ✅ admin@college.com — Dr. Rajesh Kumar");
 
-  const admin1 = await createUser({ id: "user-admin-1", email: "admin@college.com", name: "Dr. Rajesh Kumar", role: "admin", phone: "9876543210", gender: Gender.male, employeeId: "ADM001", departmentId: depts.CSE.id });
-  console.log(`  ✅ admin@college.com — Dr. Rajesh Kumar (Super Admin)`);
-
-  const admin2 = await createUser({ id: "user-admin-2", email: "registrar@college.com", name: "Mrs. Priya Sharma", role: "admin", phone: "9876543211", gender: Gender.female, employeeId: "ADM002" });
-  console.log(`  ✅ registrar@college.com — Mrs. Priya Sharma (Registrar)`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // 8. USERS — FACULTY
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n👨‍🏫 Creating faculty accounts...");
+  // ══════════════════════════════════════════════════════════════════
+  // 8. USERS — FACULTY (6 per dept = 18 total)
+  //    4 senior (existing) + 2 junior per dept for realistic coverage
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n👨‍🏫 Creating faculty (18)...");
 
   const facultyData = [
-    { id: "user-fac-1", email: "amit.verma@college.com",     name: "Prof. Amit Verma",    phone: "9800000001", gender: Gender.male,   employeeId: "FAC001", deptCode: "CSE" },
-    { id: "user-fac-2", email: "sneha.patil@college.com",    name: "Dr. Sneha Patil",     phone: "9800000002", gender: Gender.female, employeeId: "FAC002", deptCode: "CSE" },
-    { id: "user-fac-3", email: "ravi.krishnan@college.com",  name: "Prof. Ravi Krishnan", phone: "9800000003", gender: Gender.male,   employeeId: "FAC003", deptCode: "CSE" },
-    { id: "user-fac-4", email: "meena.iyer@college.com",     name: "Dr. Meena Iyer",      phone: "9800000004", gender: Gender.female, employeeId: "FAC004", deptCode: "ME" },
-    { id: "user-fac-5", email: "suresh.reddy@college.com",   name: "Prof. Suresh Reddy",  phone: "9800000005", gender: Gender.male,   employeeId: "FAC005", deptCode: "ME" },
-    { id: "user-fac-6", email: "anita.desai@college.com",    name: "Dr. Anita Desai",     phone: "9800000006", gender: Gender.female, employeeId: "FAC006", deptCode: "ECE" },
-    { id: "user-fac-7", email: "kiran.joshi@college.com",    name: "Prof. Kiran Joshi",   phone: "9800000007", gender: Gender.male,   employeeId: "FAC007", deptCode: "ECE" },
-    { id: "user-fac-8", email: "deepak.singh@college.com",   name: "Dr. Deepak Singh",    phone: "9800000008", gender: Gender.male,   employeeId: "FAC008", deptCode: "CE" },
-    { id: "user-fac-9", email: "pooja.nair@college.com",     name: "Prof. Pooja Nair",    phone: "9800000009", gender: Gender.female, employeeId: "FAC009", deptCode: "EE" },
-    { id: "user-fac-10", email: "vikas.gupta@college.com",   name: "Dr. Vikas Gupta",     phone: "9800000010", gender: Gender.male,   employeeId: "FAC010", deptCode: "CSE" },
-    { id: "user-fac-11", email: "lakshmi.pillai@college.com", name: "Prof. Lakshmi Pillai", phone: "9800000011", gender: Gender.female, employeeId: "FAC011", deptCode: "CE" },
-    { id: "user-fac-12", email: "manoj.tiwari@college.com",  name: "Prof. Manoj Tiwari",  phone: "9800000012", gender: Gender.male,   employeeId: "FAC012", deptCode: "EE" },
+    // CMPN Faculty (6)
+    { id: "fac-cmpn-1", email: "amit.verma@college.com",     name: "Prof. Amit Verma",     phone: "9800000001", gender: Gender.male,   employeeId: "FAC001", deptCode: "CMPN" },
+    { id: "fac-cmpn-2", email: "sneha.patil@college.com",    name: "Dr. Sneha Patil",      phone: "9800000002", gender: Gender.female, employeeId: "FAC002", deptCode: "CMPN" },
+    { id: "fac-cmpn-3", email: "ravi.krishnan@college.com",  name: "Prof. Ravi Krishnan",  phone: "9800000003", gender: Gender.male,   employeeId: "FAC003", deptCode: "CMPN" },
+    { id: "fac-cmpn-4", email: "vikas.gupta@college.com",    name: "Dr. Vikas Gupta",      phone: "9800000004", gender: Gender.male,   employeeId: "FAC004", deptCode: "CMPN" },
+    { id: "fac-cmpn-5", email: "neeraj.sharma@college.com",  name: "Prof. Neeraj Sharma",  phone: "9800000013", gender: Gender.male,   employeeId: "FAC013", deptCode: "CMPN" },
+    { id: "fac-cmpn-6", email: "priyanka.more@college.com",  name: "Dr. Priyanka More",    phone: "9800000014", gender: Gender.female, employeeId: "FAC014", deptCode: "CMPN" },
+    // IT Faculty (6)
+    { id: "fac-it-1",   email: "anita.desai@college.com",    name: "Dr. Anita Desai",      phone: "9800000005", gender: Gender.female, employeeId: "FAC005", deptCode: "IT" },
+    { id: "fac-it-2",   email: "kiran.joshi@college.com",    name: "Prof. Kiran Joshi",    phone: "9800000006", gender: Gender.male,   employeeId: "FAC006", deptCode: "IT" },
+    { id: "fac-it-3",   email: "meena.iyer@college.com",     name: "Dr. Meena Iyer",       phone: "9800000007", gender: Gender.female, employeeId: "FAC007", deptCode: "IT" },
+    { id: "fac-it-4",   email: "suresh.reddy@college.com",   name: "Prof. Suresh Reddy",   phone: "9800000008", gender: Gender.male,   employeeId: "FAC008", deptCode: "IT" },
+    { id: "fac-it-5",   email: "rahul.kulkarni@college.com", name: "Prof. Rahul Kulkarni", phone: "9800000015", gender: Gender.male,   employeeId: "FAC015", deptCode: "IT" },
+    { id: "fac-it-6",   email: "swati.chavan@college.com",   name: "Dr. Swati Chavan",     phone: "9800000016", gender: Gender.female, employeeId: "FAC016", deptCode: "IT" },
+    // AI Faculty (6)
+    { id: "fac-ai-1",   email: "deepak.singh@college.com",   name: "Dr. Deepak Singh",     phone: "9800000009", gender: Gender.male,   employeeId: "FAC009", deptCode: "AIDS" },
+    { id: "fac-ai-2",   email: "pooja.nair@college.com",     name: "Prof. Pooja Nair",     phone: "9800000010", gender: Gender.female, employeeId: "FAC010", deptCode: "AIDS" },
+    { id: "fac-ai-3",   email: "lakshmi.pillai@college.com", name: "Dr. Lakshmi Pillai",   phone: "9800000011", gender: Gender.female, employeeId: "FAC011", deptCode: "AIDS" },
+    { id: "fac-ai-4",   email: "manoj.tiwari@college.com",   name: "Prof. Manoj Tiwari",   phone: "9800000012", gender: Gender.male,   employeeId: "FAC012", deptCode: "AIDS" },
+    { id: "fac-ai-5",   email: "arvind.menon@college.com",   name: "Prof. Arvind Menon",   phone: "9800000017", gender: Gender.male,   employeeId: "FAC017", deptCode: "AIDS" },
+    { id: "fac-ai-6",   email: "kavita.rao@college.com",     name: "Dr. Kavita Rao",       phone: "9800000018", gender: Gender.female, employeeId: "FAC018", deptCode: "AIDS" },
   ];
 
   const faculty: Record<string, any> = {};
@@ -304,754 +326,455 @@ async function main() {
     console.log(`  ✅ ${f.email} — ${f.name} (${f.deptCode})`);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 9. USERS — STUDENTS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n👨‍🎓 Creating student accounts...");
+  // ══════════════════════════════════════════════════════════════════
+  // 9. USERS — STUDENTS (6 per section × 8 sections = 48 total)
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n🎒 Creating students (48)...");
 
-  const studentData = [
-    // CSE 2023 Section A (6 students)
-    { id: "user-stu-01", email: "rahul.sharma@student.com",    name: "Rahul Sharma",    gender: Gender.male,   enrollmentNo: "CSE2023001", guardianName: "Mr. Vijay Sharma",   guardianPhone: "9700000001", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    { id: "user-stu-02", email: "priya.singh@student.com",     name: "Priya Singh",     gender: Gender.female, enrollmentNo: "CSE2023002", guardianName: "Mr. Rakesh Singh",   guardianPhone: "9700000002", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    { id: "user-stu-03", email: "arjun.patel@student.com",     name: "Arjun Patel",     gender: Gender.male,   enrollmentNo: "CSE2023003", guardianName: "Mr. Sunil Patel",    guardianPhone: "9700000003", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    { id: "user-stu-04", email: "neha.gupta@student.com",      name: "Neha Gupta",      gender: Gender.female, enrollmentNo: "CSE2023004", guardianName: "Mr. Ashok Gupta",    guardianPhone: "9700000004", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    { id: "user-stu-05", email: "vikram.joshi@student.com",    name: "Vikram Joshi",    gender: Gender.male,   enrollmentNo: "CSE2023005", guardianName: "Mr. Ramesh Joshi",   guardianPhone: "9700000005", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    { id: "user-stu-06", email: "sana.khan@student.com",       name: "Sana Khan",       gender: Gender.female, enrollmentNo: "CSE2023006", guardianName: "Mr. Irfan Khan",     guardianPhone: "9700000006", batchId: "batch-cse-2023", sectionId: "sec-cse23-A", deptCode: "CSE" },
-    // CSE 2023 Section B (6 students)
-    { id: "user-stu-07", email: "ananya.mishra@student.com",   name: "Ananya Mishra",   gender: Gender.female, enrollmentNo: "CSE2023007", guardianName: "Mr. Sanjay Mishra",  guardianPhone: "9700000007", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    { id: "user-stu-08", email: "rohit.kumar@student.com",     name: "Rohit Kumar",     gender: Gender.male,   enrollmentNo: "CSE2023008", guardianName: "Mr. Dinesh Kumar",   guardianPhone: "9700000008", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    { id: "user-stu-09", email: "kavita.reddy@student.com",    name: "Kavita Reddy",    gender: Gender.female, enrollmentNo: "CSE2023009", guardianName: "Mr. Mohan Reddy",    guardianPhone: "9700000009", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    { id: "user-stu-10", email: "aditya.nair@student.com",     name: "Aditya Nair",     gender: Gender.male,   enrollmentNo: "CSE2023010", guardianName: "Mr. Gopal Nair",     guardianPhone: "9700000010", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    { id: "user-stu-11", email: "divya.iyer@student.com",      name: "Divya Iyer",      gender: Gender.female, enrollmentNo: "CSE2023011", guardianName: "Mr. Krishna Iyer",   guardianPhone: "9700000011", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    { id: "user-stu-12", email: "harsh.agarwal@student.com",   name: "Harsh Agarwal",   gender: Gender.male,   enrollmentNo: "CSE2023012", guardianName: "Mr. Pawan Agarwal",  guardianPhone: "9700000012", batchId: "batch-cse-2023", sectionId: "sec-cse23-B", deptCode: "CSE" },
-    // CSE 2024 (4 students)
-    { id: "user-stu-13", email: "siddharth.mehta@student.com", name: "Siddharth Mehta", gender: Gender.male,   enrollmentNo: "CSE2024001", guardianName: "Mr. Paresh Mehta",   guardianPhone: "9700000013", batchId: "batch-cse-2024", sectionId: "sec-cse24-A", deptCode: "CSE" },
-    { id: "user-stu-14", email: "pooja.verma@student.com",     name: "Pooja Verma",     gender: Gender.female, enrollmentNo: "CSE2024002", guardianName: "Mr. Anil Verma",     guardianPhone: "9700000014", batchId: "batch-cse-2024", sectionId: "sec-cse24-A", deptCode: "CSE" },
-    { id: "user-stu-15", email: "akash.rao@student.com",       name: "Akash Rao",       gender: Gender.male,   enrollmentNo: "CSE2024003", guardianName: "Mr. Venkat Rao",     guardianPhone: "9700000015", batchId: "batch-cse-2024", sectionId: "sec-cse24-A", deptCode: "CSE" },
-    { id: "user-stu-16", email: "meera.pillai@student.com",    name: "Meera Pillai",    gender: Gender.female, enrollmentNo: "CSE2024004", guardianName: "Mr. Suresh Pillai",  guardianPhone: "9700000016", batchId: "batch-cse-2024", sectionId: "sec-cse24-A", deptCode: "CSE" },
-    // ME (5 students)
-    { id: "user-stu-17", email: "manish.tiwari@student.com",  name: "Manish Tiwari",   gender: Gender.male,   enrollmentNo: "ME2023001",  guardianName: "Mr. Suresh Tiwari",  guardianPhone: "9700000017", batchId: "batch-me-2023",  sectionId: "sec-me23-A",  deptCode: "ME" },
-    { id: "user-stu-18", email: "swati.pandey@student.com",   name: "Swati Pandey",    gender: Gender.female, enrollmentNo: "ME2023002",  guardianName: "Mr. Rajiv Pandey",   guardianPhone: "9700000018", batchId: "batch-me-2023",  sectionId: "sec-me23-A",  deptCode: "ME" },
-    { id: "user-stu-19", email: "rajat.saxena@student.com",   name: "Rajat Saxena",    gender: Gender.male,   enrollmentNo: "ME2023003",  guardianName: "Mr. Prakash Saxena", guardianPhone: "9700000019", batchId: "batch-me-2023",  sectionId: "sec-me23-A",  deptCode: "ME" },
-    { id: "user-stu-20", email: "nisha.bhat@student.com",     name: "Nisha Bhat",      gender: Gender.female, enrollmentNo: "ME2023004",  guardianName: "Mr. Ganesh Bhat",    guardianPhone: "9700000020", batchId: "batch-me-2023",  sectionId: "sec-me23-A",  deptCode: "ME" },
-    { id: "user-stu-21", email: "virat.thakur@student.com",   name: "Virat Thakur",    gender: Gender.male,   enrollmentNo: "ME2023005",  guardianName: "Mr. Rajan Thakur",   guardianPhone: "9700000021", batchId: "batch-me-2023",  sectionId: "sec-me23-A",  deptCode: "ME" },
-    // ECE (5 students)
-    { id: "user-stu-22", email: "megha.das@student.com",      name: "Megha Das",       gender: Gender.female, enrollmentNo: "ECE2023001", guardianName: "Mr. Tapan Das",      guardianPhone: "9700000022", batchId: "batch-ece-2023", sectionId: "sec-ece23-A", deptCode: "ECE" },
-    { id: "user-stu-23", email: "aman.chauhan@student.com",   name: "Aman Chauhan",    gender: Gender.male,   enrollmentNo: "ECE2023002", guardianName: "Mr. Vikash Chauhan", guardianPhone: "9700000023", batchId: "batch-ece-2023", sectionId: "sec-ece23-A", deptCode: "ECE" },
-    { id: "user-stu-24", email: "ritika.bose@student.com",    name: "Ritika Bose",     gender: Gender.female, enrollmentNo: "ECE2023003", guardianName: "Mr. Samir Bose",     guardianPhone: "9700000024", batchId: "batch-ece-2023", sectionId: "sec-ece23-A", deptCode: "ECE" },
-    { id: "user-stu-25", email: "tanmay.sinha@student.com",   name: "Tanmay Sinha",    gender: Gender.male,   enrollmentNo: "ECE2023004", guardianName: "Mr. Pramod Sinha",   guardianPhone: "9700000025", batchId: "batch-ece-2023", sectionId: "sec-ece23-A", deptCode: "ECE" },
-    { id: "user-stu-26", email: "shreya.menon@student.com",   name: "Shreya Menon",    gender: Gender.female, enrollmentNo: "ECE2023005", guardianName: "Mr. Ajay Menon",     guardianPhone: "9700000026", batchId: "batch-ece-2023", sectionId: "sec-ece23-A", deptCode: "ECE" },
-    // CE (3 students)
-    { id: "user-stu-27", email: "gaurav.choudhary@student.com", name: "Gaurav Choudhary", gender: Gender.male,   enrollmentNo: "CE2023001", guardianName: "Mr. Ram Choudhary", guardianPhone: "9700000027", batchId: "batch-ce-2023", sectionId: "sec-ce23-A", deptCode: "CE" },
-    { id: "user-stu-28", email: "pallavi.jain@student.com",     name: "Pallavi Jain",     gender: Gender.female, enrollmentNo: "CE2023002", guardianName: "Mr. Deepak Jain",   guardianPhone: "9700000028", batchId: "batch-ce-2023", sectionId: "sec-ce23-A", deptCode: "CE" },
-    { id: "user-stu-29", email: "nikhil.bhatt@student.com",     name: "Nikhil Bhatt",     gender: Gender.male,   enrollmentNo: "CE2023003", guardianName: "Mr. Rajesh Bhatt",  guardianPhone: "9700000029", batchId: "batch-ce-2023", sectionId: "sec-ce23-A", deptCode: "CE" },
-    // EE (3 students)
-    { id: "user-stu-30", email: "ritu.dey@student.com",      name: "Ritu Dey",       gender: Gender.female, enrollmentNo: "EE2024001", guardianName: "Mr. Partha Dey",    guardianPhone: "9700000030", batchId: "batch-ee-2024", sectionId: "sec-ee24-A", deptCode: "EE" },
-    { id: "user-stu-31", email: "kunal.banerjee@student.com", name: "Kunal Banerjee", gender: Gender.male,   enrollmentNo: "EE2024002", guardianName: "Mr. Amit Banerjee", guardianPhone: "9700000031", batchId: "batch-ee-2024", sectionId: "sec-ee24-A", deptCode: "EE" },
-    { id: "user-stu-32", email: "aparna.nambiar@student.com", name: "Aparna Nambiar", gender: Gender.female, enrollmentNo: "EE2024003", guardianName: "Mr. Vijay Nambiar", guardianPhone: "9700000032", batchId: "batch-ee-2024", sectionId: "sec-ee24-A", deptCode: "EE" },
+  const studentNames = [
+    { name: "Aarav Sharma",    gender: Gender.male },
+    { name: "Priya Patel",     gender: Gender.female },
+    { name: "Rohan Mehta",     gender: Gender.male },
+    { name: "Ananya Singh",    gender: Gender.female },
+    { name: "Vivaan Kulkarni", gender: Gender.male },
+    { name: "Isha Deshmukh",   gender: Gender.female },
+    { name: "Arjun Gupta",     gender: Gender.male },
+    { name: "Kavya Jain",      gender: Gender.female },
+    { name: "Dev Rajput",      gender: Gender.male },
+    { name: "Riya Chopra",     gender: Gender.female },
+    { name: "Siddharth More",  gender: Gender.male },
+    { name: "Tanvi Bhatt",     gender: Gender.female },
+    { name: "Kartik Thakur",   gender: Gender.male },
+    { name: "Neha Pawar",      gender: Gender.female },
+    { name: "Yash Wagh",       gender: Gender.male },
+    { name: "Sakshi Rane",     gender: Gender.female },
+    { name: "Mihir Deshpande", gender: Gender.male },
+    { name: "Aditi Kale",      gender: Gender.female },
+    { name: "Pranav Sawant",   gender: Gender.male },
+    { name: "Shreya Mane",     gender: Gender.female },
+    { name: "Aditya Shetty",   gender: Gender.male },
+    { name: "Diya Nair",       gender: Gender.female },
+    { name: "Harsh Pandey",    gender: Gender.male },
+    { name: "Mira Gaikwad",    gender: Gender.female },
+    { name: "Raj Prabhu",      gender: Gender.male },
+    { name: "Swati Kamble",    gender: Gender.female },
+    { name: "Nikhil Jadhav",   gender: Gender.male },
+    { name: "Pooja Shinde",    gender: Gender.female },
+    { name: "Varun Chavan",    gender: Gender.male },
+    { name: "Ritika Sonawane", gender: Gender.female },
+    { name: "Aniket Ghadge",   gender: Gender.male },
+    { name: "Pallavi Ingale",  gender: Gender.female },
+    { name: "Omkar Bhosale",   gender: Gender.male },
+    { name: "Mansi Nalawade",  gender: Gender.female },
+    { name: "Tushar Nikam",    gender: Gender.male },
+    { name: "Ankita Suryawanshi", gender: Gender.female },
+    // Extra students for IT-2024 and AI-2024 sections
+    { name: "Sahil Patil",     gender: Gender.male },
+    { name: "Nikita Joshi",    gender: Gender.female },
+    { name: "Kunal Desai",     gender: Gender.male },
+    { name: "Rashmi Kulkarni", gender: Gender.female },
+    { name: "Akash Parab",     gender: Gender.male },
+    { name: "Snehal Gadkari",  gender: Gender.female },
+    { name: "Tejas Dongre",    gender: Gender.male },
+    { name: "Vrushali Pathak", gender: Gender.female },
+    { name: "Gaurav Naik",     gender: Gender.male },
+    { name: "Aparna Shirke",   gender: Gender.female },
+    { name: "Rohit Bendre",    gender: Gender.male },
+    { name: "Megha Phadke",    gender: Gender.female },
   ];
 
-  const students: Record<string, any> = {};
-  for (const s of studentData) {
-    students[s.id] = await createUser({
-      id: s.id, email: s.email, name: s.name, role: "student",
-      gender: s.gender, enrollmentNo: s.enrollmentNo,
-      guardianName: s.guardianName, guardianPhone: s.guardianPhone,
-      departmentId: depts[s.deptCode].id,
-      batchId: batches[s.batchId].id,
-      sectionId: sections[s.sectionId].id,
-    });
-    console.log(`  ✅ ${s.email} — ${s.name} (${s.deptCode} ${s.enrollmentNo})`);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // 10. USERS — WARDENS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🏠 Creating warden accounts...");
-
-  const warden1 = await createUser({ id: "user-warden-1", email: "warden.boys@college.com", name: "Mr. Ramesh Yadav", role: "warden", phone: "9800100001", gender: Gender.male, employeeId: "WRD001" });
-  console.log(`  ✅ warden.boys@college.com — Mr. Ramesh Yadav`);
-
-  const warden2 = await createUser({ id: "user-warden-2", email: "warden.girls@college.com", name: "Mrs. Sunita Devi", role: "warden", phone: "9800100002", gender: Gender.female, employeeId: "WRD002" });
-  console.log(`  ✅ warden.girls@college.com — Mrs. Sunita Devi`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // 11. RESOLVE USER IDS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🔗 Resolving user IDs from database...");
-
-  const allFaculty = await prisma.user.findMany({ where: { role: "faculty" } });
-  const facByEmail: Record<string, string> = {};
-  for (const f of allFaculty) facByEmail[f.email] = f.id;
-
-  const allStudents = await prisma.user.findMany({ where: { role: "student" } });
-  const stuByEmail: Record<string, string> = {};
-  for (const s of allStudents) stuByEmail[s.email] = s.id;
-
-  const allAdmins = await prisma.user.findMany({ where: { role: "admin" } });
-  const adminByEmail: Record<string, string> = {};
-  for (const a of allAdmins) adminByEmail[a.email] = a.id;
-
-  const allWardens = await prisma.user.findMany({ where: { role: "warden" } });
-  const wardenByEmail: Record<string, string> = {};
-  for (const w of allWardens) wardenByEmail[w.email] = w.id;
-  console.log(`  ✅ Resolved ${allFaculty.length} faculty, ${allStudents.length} students, ${allAdmins.length} admins, ${allWardens.length} wardens`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // 12. FACULTY-SUBJECT MAPPINGS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🔗 Creating faculty-subject mappings...");
-
-  const fsMappings = [
-    // CSE Section A
-    { facEmail: "amit.verma@college.com",    subjectCode: "CS501", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "amit.verma@college.com",    subjectCode: "CS591", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "sneha.patil@college.com",   subjectCode: "CS502", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "sneha.patil@college.com",   subjectCode: "CS503", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "ravi.krishnan@college.com", subjectCode: "CS504", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "ravi.krishnan@college.com", subjectCode: "CS505", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "vikas.gupta@college.com",   subjectCode: "CS506", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    { facEmail: "sneha.patil@college.com",   subjectCode: "CS592", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-A" },
-    // CSE Section B
-    { facEmail: "ravi.krishnan@college.com", subjectCode: "CS501", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-B" },
-    { facEmail: "amit.verma@college.com",    subjectCode: "CS502", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-B" },
-    { facEmail: "vikas.gupta@college.com",   subjectCode: "CS503", semKey: "BTECH-CSE-sem5", sectionId: "sec-cse23-B" },
-    // ME
-    { facEmail: "meena.iyer@college.com",    subjectCode: "ME501", semKey: "BTECH-ME-sem5",  sectionId: "sec-me23-A" },
-    { facEmail: "meena.iyer@college.com",    subjectCode: "ME502", semKey: "BTECH-ME-sem5",  sectionId: "sec-me23-A" },
-    { facEmail: "suresh.reddy@college.com",  subjectCode: "ME503", semKey: "BTECH-ME-sem5",  sectionId: "sec-me23-A" },
-    { facEmail: "suresh.reddy@college.com",  subjectCode: "ME504", semKey: "BTECH-ME-sem5",  sectionId: "sec-me23-A" },
-    { facEmail: "meena.iyer@college.com",    subjectCode: "ME591", semKey: "BTECH-ME-sem5",  sectionId: "sec-me23-A" },
-    // ECE
-    { facEmail: "anita.desai@college.com",   subjectCode: "EC501", semKey: "BTECH-ECE-sem5", sectionId: "sec-ece23-A" },
-    { facEmail: "anita.desai@college.com",   subjectCode: "EC502", semKey: "BTECH-ECE-sem5", sectionId: "sec-ece23-A" },
-    { facEmail: "kiran.joshi@college.com",   subjectCode: "EC503", semKey: "BTECH-ECE-sem5", sectionId: "sec-ece23-A" },
-    { facEmail: "kiran.joshi@college.com",   subjectCode: "EC504", semKey: "BTECH-ECE-sem5", sectionId: "sec-ece23-A" },
-    { facEmail: "anita.desai@college.com",   subjectCode: "EC591", semKey: "BTECH-ECE-sem5", sectionId: "sec-ece23-A" },
-    // CE
-    { facEmail: "deepak.singh@college.com",  subjectCode: "CE501", semKey: "BTECH-CE-sem5",  sectionId: "sec-ce23-A" },
-    { facEmail: "deepak.singh@college.com",  subjectCode: "CE502", semKey: "BTECH-CE-sem5",  sectionId: "sec-ce23-A" },
-    { facEmail: "lakshmi.pillai@college.com", subjectCode: "CE503", semKey: "BTECH-CE-sem5",  sectionId: "sec-ce23-A" },
-    // EE
-    { facEmail: "pooja.nair@college.com",    subjectCode: "EE501", semKey: "BTECH-EE-sem5",  sectionId: "sec-ee24-A" },
-    { facEmail: "pooja.nair@college.com",    subjectCode: "EE502", semKey: "BTECH-EE-sem5",  sectionId: "sec-ee24-A" },
-    { facEmail: "manoj.tiwari@college.com",  subjectCode: "EE503", semKey: "BTECH-EE-sem5",  sectionId: "sec-ee24-A" },
+  // Assign students to sections (all 8 sections get students)
+  const studentSections = [
+    { sectionId: "sec-cmpn23-A", batchId: "batch-cmpn-23", deptCode: "CMPN", prefix: "CMPN23A", start: 0, count: 6 },
+    { sectionId: "sec-cmpn23-B", batchId: "batch-cmpn-23", deptCode: "CMPN", prefix: "CMPN23B", start: 6, count: 6 },
+    { sectionId: "sec-it23-A",   batchId: "batch-it-23",   deptCode: "IT",   prefix: "IT23A",   start: 12, count: 6 },
+    { sectionId: "sec-it23-B",   batchId: "batch-it-23",   deptCode: "IT",   prefix: "IT23B",   start: 18, count: 6 },
+    { sectionId: "sec-ai23-A",   batchId: "batch-ai-23",   deptCode: "AIDS", prefix: "AIDS23A", start: 24, count: 6 },
+    { sectionId: "sec-cmpn24-A", batchId: "batch-cmpn-24", deptCode: "CMPN", prefix: "CMPN24A", start: 30, count: 6 },
+    { sectionId: "sec-it24-A",   batchId: "batch-it-24",   deptCode: "IT",   prefix: "IT24A",   start: 36, count: 6 },
+    { sectionId: "sec-ai24-A",   batchId: "batch-ai-24",   deptCode: "AIDS", prefix: "AIDS24A", start: 42, count: 6 },
   ];
 
-  for (const m of fsMappings) {
-    const facId = facByEmail[m.facEmail]!;
-    const sub = subjects[m.subjectCode];
-    await prisma.facultySubject.upsert({
-      where: {
-        facultyId_subjectId_semesterId_sectionId: {
-          facultyId: facId, subjectId: sub.id,
-          semesterId: semesters[m.semKey].id, sectionId: sections[m.sectionId].id,
-        },
-      },
-      update: {},
-      create: {
-        facultyId: facId, subjectId: sub.id,
-        semesterId: semesters[m.semKey].id, sectionId: sections[m.sectionId].id,
-      },
-    });
+  const students: any[] = [];
+  let studentIdx = 1;
+  for (const sec of studentSections) {
+    for (let i = 0; i < sec.count; i++) {
+      const s = studentNames[sec.start + i]!;
+      const emailName = s.name.toLowerCase().replace(/\s+/g, ".").replace(/[^a-z.]/g, "");
+      const student = await createUser({
+        id: `stu-${studentIdx}`,
+        email: `${emailName}@student.college.com`,
+        name: s.name,
+        role: "student",
+        gender: s.gender,
+        phone: `98${String(70000000 + studentIdx).padStart(8, "0")}`,
+        enrollmentNo: `${sec.prefix}${String(i + 1).padStart(3, "0")}`,
+        guardianName: `Mr. ${s.name.split(" ")[1]}`,
+        guardianPhone: `98${String(60000000 + studentIdx).padStart(8, "0")}`,
+        departmentId: depts[sec.deptCode].id,
+        batchId: batches[sec.batchId].id,
+        sectionId: sections[sec.sectionId].id,
+      });
+      students.push(student);
+      studentIdx++;
+    }
+    console.log(`  ✅ 6 students in ${sec.sectionId}`);
   }
-  console.log(`  ✅ ${fsMappings.length} faculty-subject mappings created`);
 
-  // ═══════════════════════════════════════════════════════════════
-  // 13. TIMETABLE
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🗓️ Creating timetable...");
+  // ══════════════════════════════════════════════════════════════════
+  // 10. FACULTY-SUBJECT ASSIGNMENTS (critical for timetable!)
+  //     Every section must have assignments for its semester's subjects.
+  //     Sem5 = 2023 batch (3rd year), Sem3 = 2024 batch (2nd year)
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n🔗 Assigning faculty to subjects...");
 
-  const ttSlots = [
-    // CSE Section A — full week
-    { day: 0, start: "09:00", end: "10:00", sub: "CS501", facEmail: "amit.verma@college.com",    sec: "sec-cse23-A", room: "Room 301" },
-    { day: 0, start: "10:00", end: "11:00", sub: "CS502", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Room 301" },
-    { day: 0, start: "11:15", end: "12:15", sub: "CS503", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Room 301" },
-    { day: 0, start: "14:00", end: "15:00", sub: "CS504", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 302" },
-    { day: 0, start: "15:00", end: "16:00", sub: "CS506", facEmail: "vikas.gupta@college.com",   sec: "sec-cse23-A", room: "Room 302" },
-    { day: 1, start: "09:00", end: "10:00", sub: "CS505", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 301" },
-    { day: 1, start: "10:00", end: "11:00", sub: "CS501", facEmail: "amit.verma@college.com",    sec: "sec-cse23-A", room: "Room 301" },
-    { day: 1, start: "14:00", end: "16:00", sub: "CS591", facEmail: "amit.verma@college.com",    sec: "sec-cse23-A", room: "Lab A1" },
-    { day: 2, start: "09:00", end: "10:00", sub: "CS502", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Room 301" },
-    { day: 2, start: "10:00", end: "11:00", sub: "CS504", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 301" },
-    { day: 2, start: "14:00", end: "16:00", sub: "CS592", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Lab A2" },
-    { day: 3, start: "09:00", end: "10:00", sub: "CS503", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Room 301" },
-    { day: 3, start: "10:00", end: "11:00", sub: "CS505", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 301" },
-    { day: 3, start: "11:15", end: "12:15", sub: "CS501", facEmail: "amit.verma@college.com",    sec: "sec-cse23-A", room: "Room 301" },
-    { day: 4, start: "09:00", end: "10:00", sub: "CS504", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 302" },
-    { day: 4, start: "10:00", end: "11:00", sub: "CS502", facEmail: "sneha.patil@college.com",   sec: "sec-cse23-A", room: "Room 301" },
-    { day: 4, start: "11:15", end: "12:15", sub: "CS505", facEmail: "ravi.krishnan@college.com", sec: "sec-cse23-A", room: "Room 301" },
-    { day: 4, start: "14:00", end: "15:00", sub: "CS506", facEmail: "vikas.gupta@college.com",   sec: "sec-cse23-A", room: "Room 303" },
-    // ME Section A
-    { day: 0, start: "09:00", end: "10:00", sub: "ME501", facEmail: "meena.iyer@college.com",    sec: "sec-me23-A",  room: "Room 201" },
-    { day: 0, start: "10:00", end: "11:00", sub: "ME502", facEmail: "meena.iyer@college.com",    sec: "sec-me23-A",  room: "Room 201" },
-    { day: 1, start: "09:00", end: "10:00", sub: "ME503", facEmail: "suresh.reddy@college.com",  sec: "sec-me23-A",  room: "Room 202" },
-    { day: 1, start: "10:00", end: "11:00", sub: "ME504", facEmail: "suresh.reddy@college.com",  sec: "sec-me23-A",  room: "Room 202" },
-    { day: 2, start: "09:00", end: "10:00", sub: "ME501", facEmail: "meena.iyer@college.com",    sec: "sec-me23-A",  room: "Room 201" },
-    { day: 2, start: "14:00", end: "16:00", sub: "ME591", facEmail: "meena.iyer@college.com",    sec: "sec-me23-A",  room: "Thermal Lab" },
-    { day: 3, start: "09:00", end: "10:00", sub: "ME502", facEmail: "meena.iyer@college.com",    sec: "sec-me23-A",  room: "Room 201" },
-    { day: 3, start: "10:00", end: "11:00", sub: "ME503", facEmail: "suresh.reddy@college.com",  sec: "sec-me23-A",  room: "Room 202" },
-    { day: 4, start: "09:00", end: "10:00", sub: "ME504", facEmail: "suresh.reddy@college.com",  sec: "sec-me23-A",  room: "Room 202" },
-    // ECE Section A
-    { day: 0, start: "09:00", end: "10:00", sub: "EC501", facEmail: "anita.desai@college.com",   sec: "sec-ece23-A", room: "Room 401" },
-    { day: 0, start: "10:00", end: "11:00", sub: "EC502", facEmail: "anita.desai@college.com",   sec: "sec-ece23-A", room: "Room 401" },
-    { day: 1, start: "09:00", end: "10:00", sub: "EC503", facEmail: "kiran.joshi@college.com",   sec: "sec-ece23-A", room: "Room 402" },
-    { day: 1, start: "10:00", end: "11:00", sub: "EC504", facEmail: "kiran.joshi@college.com",   sec: "sec-ece23-A", room: "Room 402" },
-    { day: 2, start: "09:00", end: "10:00", sub: "EC501", facEmail: "anita.desai@college.com",   sec: "sec-ece23-A", room: "Room 401" },
-    { day: 2, start: "14:00", end: "16:00", sub: "EC591", facEmail: "anita.desai@college.com",   sec: "sec-ece23-A", room: "DSP Lab" },
-    { day: 3, start: "09:00", end: "10:00", sub: "EC502", facEmail: "anita.desai@college.com",   sec: "sec-ece23-A", room: "Room 401" },
-    { day: 3, start: "10:00", end: "11:00", sub: "EC503", facEmail: "kiran.joshi@college.com",   sec: "sec-ece23-A", room: "Room 402" },
-    { day: 4, start: "09:00", end: "10:00", sub: "EC504", facEmail: "kiran.joshi@college.com",   sec: "sec-ece23-A", room: "Room 402" },
-    // CE Section A
-    { day: 0, start: "09:00", end: "10:00", sub: "CE501", facEmail: "deepak.singh@college.com",  sec: "sec-ce23-A",  room: "Room 501" },
-    { day: 0, start: "10:00", end: "11:00", sub: "CE502", facEmail: "deepak.singh@college.com",  sec: "sec-ce23-A",  room: "Room 501" },
-    { day: 1, start: "09:00", end: "10:00", sub: "CE503", facEmail: "lakshmi.pillai@college.com", sec: "sec-ce23-A",  room: "Room 502" },
-    { day: 2, start: "09:00", end: "10:00", sub: "CE501", facEmail: "deepak.singh@college.com",  sec: "sec-ce23-A",  room: "Room 501" },
-    { day: 3, start: "09:00", end: "10:00", sub: "CE502", facEmail: "deepak.singh@college.com",  sec: "sec-ce23-A",  room: "Room 501" },
-    { day: 4, start: "09:00", end: "10:00", sub: "CE503", facEmail: "lakshmi.pillai@college.com", sec: "sec-ce23-A",  room: "Room 502" },
-    // EE Section A
-    { day: 0, start: "09:00", end: "10:00", sub: "EE501", facEmail: "pooja.nair@college.com",    sec: "sec-ee24-A",  room: "Room 601" },
-    { day: 0, start: "10:00", end: "11:00", sub: "EE502", facEmail: "pooja.nair@college.com",    sec: "sec-ee24-A",  room: "Room 601" },
-    { day: 1, start: "09:00", end: "10:00", sub: "EE503", facEmail: "manoj.tiwari@college.com",  sec: "sec-ee24-A",  room: "Room 602" },
-    { day: 2, start: "09:00", end: "10:00", sub: "EE501", facEmail: "pooja.nair@college.com",    sec: "sec-ee24-A",  room: "Room 601" },
-    { day: 3, start: "09:00", end: "10:00", sub: "EE502", facEmail: "pooja.nair@college.com",    sec: "sec-ee24-A",  room: "Room 601" },
-    { day: 4, start: "09:00", end: "10:00", sub: "EE503", facEmail: "manoj.tiwari@college.com",  sec: "sec-ee24-A",  room: "Room 602" },
+  const sem5Cmpn = semesters["BTECH-CMPN-sem5"].id;
+  const sem5It   = semesters["BTECH-IT-sem5"].id;
+  const sem5Ai   = semesters["BTECH-AIDS-sem5"].id;
+  const sem3Cmpn = semesters["BTECH-CMPN-sem3"].id;
+  const sem3It   = semesters["BTECH-IT-sem3"].id;
+  const sem3Ai   = semesters["BTECH-AIDS-sem3"].id;
+
+  const fsData = [
+    // ────────────────────────────────────────────────────────────────
+    // CMPN Section A (Sem 5) — 7 subjects, 4 faculty
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-cmpn-1"].id, subjectId: subjects["CMPN501"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-1"].id, subjectId: subjects["CMPN591"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-2"].id, subjectId: subjects["CMPN502"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-3"].id, subjectId: subjects["CMPN503"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-3"].id, subjectId: subjects["CMPN592"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-4"].id, subjectId: subjects["CMPN504"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+    { facultyId: faculty["fac-cmpn-2"].id, subjectId: subjects["CMPN505"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-A"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // CMPN Section B (Sem 5) — SHARED faculty (cross-section conflict test!)
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-cmpn-1"].id, subjectId: subjects["CMPN501"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-1"].id, subjectId: subjects["CMPN591"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-2"].id, subjectId: subjects["CMPN502"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-3"].id, subjectId: subjects["CMPN503"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-3"].id, subjectId: subjects["CMPN592"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-4"].id, subjectId: subjects["CMPN504"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+    { facultyId: faculty["fac-cmpn-4"].id, subjectId: subjects["CMPN505"].id, semesterId: sem5Cmpn, sectionId: sections["sec-cmpn23-B"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // CMPN 2024-A (Sem 3) — junior faculty (5,6) + some senior faculty
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-cmpn-5"].id, subjectId: subjects["CMPN301"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-6"].id, subjectId: subjects["CMPN302"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-5"].id, subjectId: subjects["CMPN303"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-6"].id, subjectId: subjects["CMPN304"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-4"].id, subjectId: subjects["CMPN305"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-6"].id, subjectId: subjects["CMPN391"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+    { facultyId: faculty["fac-cmpn-4"].id, subjectId: subjects["CMPN392"].id, semesterId: sem3Cmpn, sectionId: sections["sec-cmpn24-A"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // IT Section A (Sem 5)
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-it-1"].id,   subjectId: subjects["IT501"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+    { facultyId: faculty["fac-it-1"].id,   subjectId: subjects["IT591"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+    { facultyId: faculty["fac-it-2"].id,   subjectId: subjects["IT502"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+    { facultyId: faculty["fac-it-3"].id,   subjectId: subjects["IT503"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+    { facultyId: faculty["fac-it-4"].id,   subjectId: subjects["IT504"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+    { facultyId: faculty["fac-it-2"].id,   subjectId: subjects["IT505"].id,  semesterId: sem5It, sectionId: sections["sec-it23-A"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // IT Section B (Sem 5) — SHARED faculty with IT-A (cross-section!)
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-it-1"].id,   subjectId: subjects["IT501"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+    { facultyId: faculty["fac-it-1"].id,   subjectId: subjects["IT591"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+    { facultyId: faculty["fac-it-2"].id,   subjectId: subjects["IT502"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+    { facultyId: faculty["fac-it-3"].id,   subjectId: subjects["IT503"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+    { facultyId: faculty["fac-it-4"].id,   subjectId: subjects["IT504"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+    { facultyId: faculty["fac-it-4"].id,   subjectId: subjects["IT505"].id,  semesterId: sem5It, sectionId: sections["sec-it23-B"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // IT 2024-A (Sem 3) — junior IT faculty (5,6) + some senior
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-it-5"].id,   subjectId: subjects["IT301"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-6"].id,   subjectId: subjects["IT302"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-5"].id,   subjectId: subjects["IT303"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-6"].id,   subjectId: subjects["IT304"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-3"].id,   subjectId: subjects["IT305"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-6"].id,   subjectId: subjects["IT391"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+    { facultyId: faculty["fac-it-5"].id,   subjectId: subjects["IT392"].id,  semesterId: sem3It, sectionId: sections["sec-it24-A"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // AI Section A (Sem 5)
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-ai-1"].id,   subjectId: subjects["AI501"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+    { facultyId: faculty["fac-ai-1"].id,   subjectId: subjects["AI591"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+    { facultyId: faculty["fac-ai-2"].id,   subjectId: subjects["AI502"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+    { facultyId: faculty["fac-ai-3"].id,   subjectId: subjects["AI503"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+    { facultyId: faculty["fac-ai-4"].id,   subjectId: subjects["AI504"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+    { facultyId: faculty["fac-ai-3"].id,   subjectId: subjects["AI505"].id,  semesterId: sem5Ai, sectionId: sections["sec-ai23-A"].id },
+
+    // ────────────────────────────────────────────────────────────────
+    // AI 2024-A (Sem 3) — junior AI faculty (5,6) + some senior
+    // ────────────────────────────────────────────────────────────────
+    { facultyId: faculty["fac-ai-5"].id,   subjectId: subjects["AI301"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-6"].id,   subjectId: subjects["AI302"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-5"].id,   subjectId: subjects["AI303"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-6"].id,   subjectId: subjects["AI304"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-4"].id,   subjectId: subjects["AI305"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-6"].id,   subjectId: subjects["AI391"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
+    { facultyId: faculty["fac-ai-5"].id,   subjectId: subjects["AI392"].id,  semesterId: sem3Ai, sectionId: sections["sec-ai24-A"].id },
   ];
 
-  for (const t of ttSlots) {
-    const subPrefix = t.sub.slice(0, 2);
-    const semKey = subPrefix === "CS" ? "BTECH-CSE-sem5" : subPrefix === "ME" ? "BTECH-ME-sem5" : subPrefix === "EC" ? "BTECH-ECE-sem5" : subPrefix === "CE" ? "BTECH-CE-sem5" : "BTECH-EE-sem5";
-    await prisma.timetableSlot.create({
-      data: {
-        dayOfWeek: t.day, startTime: t.start, endTime: t.end, room: t.room,
-        subjectId: subjects[t.sub].id, facultyId: facByEmail[t.facEmail]!,
-        sectionId: sections[t.sec].id, semesterId: semesters[semKey].id,
-      },
-    });
+  for (const fs of fsData) {
+    await prisma.facultySubject.create({ data: fs });
   }
-  console.log(`  ✅ ${ttSlots.length} timetable slots created across all departments`);
+  console.log(`  ✅ ${fsData.length} faculty-subject assignments created`);
+  console.log("  📌 CMPN-A & CMPN-B share faculty, IT-A & IT-B share faculty (cross-section conflict test!)");
+  console.log("  📌 2024 batch sections (sem3) have dedicated junior faculty");
 
-  // ═══════════════════════════════════════════════════════════════
-  // 14. ATTENDANCE (realistic 15-day history for all departments)
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 11. ATTENDANCE (last 2 weeks for CMPN-A students)
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n✅ Creating attendance records...");
 
-  const sectionStudentMap: Record<string, string[]> = {};
-  for (const s of studentData) {
-    if (!sectionStudentMap[s.sectionId]) sectionStudentMap[s.sectionId] = [];
-    sectionStudentMap[s.sectionId]!.push(s.email);
-  }
+  const cmpnAStudents = students.filter((_, i) => i < 6); // first 6 = CMPN-A
+  const attendanceSubjects = [subjects["CMPN501"], subjects["CMPN502"], subjects["CMPN503"]];
+  const statuses: AttendanceStatus[] = [AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.absent, AttendanceStatus.late];
 
-  const attSubjectMap: { sectionId: string; subjects: string[]; facEmails: string[] }[] = [
-    { sectionId: "sec-cse23-A", subjects: ["CS501", "CS502", "CS503", "CS504", "CS505"], facEmails: ["amit.verma@college.com", "sneha.patil@college.com", "sneha.patil@college.com", "ravi.krishnan@college.com", "ravi.krishnan@college.com"] },
-    { sectionId: "sec-cse23-B", subjects: ["CS501", "CS502", "CS503"], facEmails: ["ravi.krishnan@college.com", "amit.verma@college.com", "vikas.gupta@college.com"] },
-    { sectionId: "sec-me23-A",  subjects: ["ME501", "ME502", "ME503"], facEmails: ["meena.iyer@college.com", "meena.iyer@college.com", "suresh.reddy@college.com"] },
-    { sectionId: "sec-ece23-A", subjects: ["EC501", "EC502", "EC503"], facEmails: ["anita.desai@college.com", "anita.desai@college.com", "kiran.joshi@college.com"] },
-    { sectionId: "sec-ce23-A",  subjects: ["CE501", "CE502", "CE503"], facEmails: ["deepak.singh@college.com", "deepak.singh@college.com", "lakshmi.pillai@college.com"] },
-    { sectionId: "sec-ee24-A",  subjects: ["EE501", "EE502", "EE503"], facEmails: ["pooja.nair@college.com", "pooja.nair@college.com", "manoj.tiwari@college.com"] },
-  ];
-
-  const statuses = [AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.absent, AttendanceStatus.late];
   let attCount = 0;
-
-  for (let dayOffset = 1; dayOffset <= 15; dayOffset++) {
-    const date = new Date(); date.setDate(date.getDate() - dayOffset);
+  for (let dayBack = 1; dayBack <= 10; dayBack++) {
+    const date = new Date();
+    date.setDate(date.getDate() - dayBack);
     if (date.getDay() === 0 || date.getDay() === 6) continue; // skip weekends
 
-    for (const mapping of attSubjectMap) {
-      const stuEmails = sectionStudentMap[mapping.sectionId] || [];
-      for (let subIdx = 0; subIdx < mapping.subjects.length; subIdx++) {
-        const subCode = mapping.subjects[subIdx]!;
-        const facEmail = mapping.facEmails[subIdx]!;
-        for (const stuEmail of stuEmails) {
-          const status = statuses[Math.floor(Math.random() * statuses.length)]!;
-          try {
-            await prisma.attendance.create({
-              data: {
-                studentId: stuByEmail[stuEmail]!, subjectId: subjects[subCode]!.id,
-                date, period: subIdx + 1,
-                status, markedById: facByEmail[facEmail]!,
-              },
-            });
-            attCount++;
-          } catch { /* skip duplicates */ }
-        }
+    for (const sub of attendanceSubjects) {
+      for (const stu of cmpnAStudents) {
+        const status = statuses[Math.floor(Math.random() * statuses.length)]!;
+        await prisma.attendance.create({
+          data: {
+            studentId: stu.id,
+            subjectId: sub.id,
+            date,
+            period: (dayBack % 3) + 1,
+            status,
+            markedById: faculty["fac-cmpn-1"].id,
+          },
+        });
+        attCount++;
       }
     }
   }
-  console.log(`  ✅ ${attCount} attendance records created across all departments`);
+  console.log(`  ✅ ${attCount} attendance records (CMPN-A, last 2 weeks)`);
 
-  // ═══════════════════════════════════════════════════════════════
-  // 15. LEAVE APPLICATIONS (diverse types and statuses)
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n📋 Creating leave applications...");
-
-  const leaveData = [
-    // Students
-    { stuEmail: "rahul.sharma@student.com",  type: LeaveType.medical,   startOff: -5, endOff: -3, reason: "Fever and cold, need rest. Doctor prescribed 3 days bed rest.",              status: ApprovalStatus.approved, approverEmail: "amit.verma@college.com",  note: "Get well soon, take care." },
-    { stuEmail: "priya.singh@student.com",   type: LeaveType.personal,  startOff: -2, endOff: -1, reason: "Family function — sister's wedding in hometown.",                           status: ApprovalStatus.approved, approverEmail: "amit.verma@college.com",  note: "Approved. Congratulations!" },
-    { stuEmail: "arjun.patel@student.com",   type: LeaveType.emergency, startOff: -1, endOff: 0,  reason: "Grandmother hospitalized, need to visit immediately.",                       status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    { stuEmail: "neha.gupta@student.com",    type: LeaveType.personal,  startOff: 2,  endOff: 3,  reason: "Passport appointment at regional passport office.",                           status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    { stuEmail: "vikram.joshi@student.com",  type: LeaveType.medical,   startOff: -8, endOff: -6, reason: "Dental surgery, doctor advised rest for 3 days.",                             status: ApprovalStatus.approved, approverEmail: "sneha.patil@college.com", note: "Approved. Submit medical certificate." },
-    { stuEmail: "ananya.mishra@student.com", type: LeaveType.other,     startOff: -3, endOff: -3, reason: "Participating in inter-college hackathon at IIT Delhi.",                      status: ApprovalStatus.rejected, approverEmail: "ravi.krishnan@college.com", note: "Cannot approve during exam week." },
-    { stuEmail: "rohit.kumar@student.com",   type: LeaveType.personal,  startOff: 1,  endOff: 2,  reason: "Need to attend younger brother's school admission interview.",                status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    { stuEmail: "kavita.reddy@student.com",  type: LeaveType.medical,   startOff: -4, endOff: -3, reason: "Migraine issues, under medication.",                                         status: ApprovalStatus.approved, approverEmail: "ravi.krishnan@college.com", note: "Rest well." },
-    { stuEmail: "manish.tiwari@student.com", type: LeaveType.medical,   startOff: -4, endOff: -2, reason: "Food poisoning, advised bed rest by hostel medical officer.",                 status: ApprovalStatus.approved, approverEmail: "meena.iyer@college.com",  note: "Approved." },
-    { stuEmail: "swati.pandey@student.com",  type: LeaveType.emergency, startOff: -1, endOff: 0,  reason: "Father met with road accident, need to go home urgently.",                   status: ApprovalStatus.approved, approverEmail: "meena.iyer@college.com",  note: "Take care, keep us updated." },
-    { stuEmail: "megha.das@student.com",     type: LeaveType.personal,  startOff: 3,  endOff: 5,  reason: "Durga Puja celebrations at home, pre-booked train tickets.",                  status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    { stuEmail: "aman.chauhan@student.com",  type: LeaveType.other,     startOff: -6, endOff: -6, reason: "Participating in university sports day as captain of cricket team.",          status: ApprovalStatus.approved, approverEmail: "kiran.joshi@college.com", note: "Approved. Best of luck!" },
-    { stuEmail: "gaurav.choudhary@student.com", type: LeaveType.medical, startOff: -2, endOff: -1, reason: "Sprained ankle during football match, doctor advised rest.",                status: ApprovalStatus.approved, approverEmail: "deepak.singh@college.com", note: "Get well soon." },
-    { stuEmail: "ritu.dey@student.com",      type: LeaveType.personal,  startOff: 4,  endOff: 6,  reason: "Elder brother's wedding in Kolkata.",                                        status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    // Faculty
-    { stuEmail: "amit.verma@college.com",    type: LeaveType.personal,  startOff: 5,  endOff: 7,  reason: "Annual family vacation planned to Goa.",                                     status: ApprovalStatus.pending,  approverEmail: null,                      note: null },
-    { stuEmail: "meena.iyer@college.com",    type: LeaveType.medical,   startOff: -3, endOff: -2, reason: "Routine health checkup and dental appointment.",                              status: ApprovalStatus.approved, approverEmail: "admin@college.com",       note: "Approved." },
-  ];
-
-  for (const l of leaveData) {
-    const start = new Date(); start.setDate(start.getDate() + l.startOff);
-    const end = new Date(); end.setDate(end.getDate() + l.endOff);
-    const userId = stuByEmail[l.stuEmail] || facByEmail[l.stuEmail]!;
-    const approverId = l.approverEmail ? (facByEmail[l.approverEmail] || adminByEmail[l.approverEmail]) : null;
-    await prisma.leaveApplication.create({
-      data: {
-        userId, type: l.type, startDate: start, endDate: end,
-        reason: l.reason, status: l.status,
-        approvedById: approverId, approverNote: l.note,
-      },
-    });
-  }
-  console.log(`  ✅ ${leaveData.length} leave applications created`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // 16. EXAMS & RESULTS (all departments)
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 12. EXAMS & RESULTS
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n📝 Creating exams & results...");
 
   const examData = [
-    // CSE
-    { id: "exam-cs501-mid", name: "DSA Mid-Term",           type: ExamType.midterm,  subCode: "CS501", total: 50, facEmail: "amit.verma@college.com",    dayOff: -15 },
-    { id: "exam-cs501-int", name: "DSA Internal 1",         type: ExamType.internal, subCode: "CS501", total: 20, facEmail: "amit.verma@college.com",    dayOff: -30 },
-    { id: "exam-cs502-mid", name: "OS Mid-Term",            type: ExamType.midterm,  subCode: "CS502", total: 50, facEmail: "sneha.patil@college.com",   dayOff: -14 },
-    { id: "exam-cs503-mid", name: "DBMS Mid-Term",          type: ExamType.midterm,  subCode: "CS503", total: 50, facEmail: "sneha.patil@college.com",   dayOff: -13 },
-    { id: "exam-cs504-int", name: "Networks Internal 1",    type: ExamType.internal, subCode: "CS504", total: 25, facEmail: "ravi.krishnan@college.com", dayOff: -25 },
-    { id: "exam-cs505-mid", name: "SE Mid-Term",            type: ExamType.midterm,  subCode: "CS505", total: 50, facEmail: "ravi.krishnan@college.com", dayOff: -12 },
-    // ME
-    { id: "exam-me501-mid", name: "Thermo II Mid-Term",     type: ExamType.midterm,  subCode: "ME501", total: 50, facEmail: "meena.iyer@college.com",    dayOff: -12 },
-    { id: "exam-me502-int", name: "Fluids Internal 1",      type: ExamType.internal, subCode: "ME502", total: 20, facEmail: "meena.iyer@college.com",    dayOff: -28 },
-    { id: "exam-me503-mid", name: "Manufacturing Mid-Term", type: ExamType.midterm,  subCode: "ME503", total: 50, facEmail: "suresh.reddy@college.com",  dayOff: -11 },
-    // ECE
-    { id: "exam-ec501-mid", name: "DSP Mid-Term",           type: ExamType.midterm,  subCode: "EC501", total: 50, facEmail: "anita.desai@college.com",   dayOff: -11 },
-    { id: "exam-ec502-int", name: "VLSI Internal 1",        type: ExamType.internal, subCode: "EC502", total: 25, facEmail: "anita.desai@college.com",   dayOff: -22 },
-    { id: "exam-ec503-mid", name: "Microprocessor Mid-Term", type: ExamType.midterm, subCode: "EC503", total: 50, facEmail: "kiran.joshi@college.com",   dayOff: -10 },
-    // CE
-    { id: "exam-ce501-mid", name: "Structural Mid-Term",    type: ExamType.midterm,  subCode: "CE501", total: 50, facEmail: "deepak.singh@college.com",  dayOff: -14 },
-    { id: "exam-ce502-int", name: "Geotech Internal 1",     type: ExamType.internal, subCode: "CE502", total: 20, facEmail: "deepak.singh@college.com",  dayOff: -26 },
-    // EE
-    { id: "exam-ee501-mid", name: "Power Systems Mid-Term", type: ExamType.midterm,  subCode: "EE501", total: 50, facEmail: "pooja.nair@college.com",    dayOff: -13 },
-    { id: "exam-ee502-int", name: "Control Internal 1",     type: ExamType.internal, subCode: "EE502", total: 20, facEmail: "pooja.nair@college.com",    dayOff: -24 },
+    { name: "DSA Mid-Term",   type: ExamType.midterm,   subjectCode: "CMPN501", totalMarks: 30, date: new Date("2026-08-15") },
+    { name: "OS Mid-Term",    type: ExamType.midterm,   subjectCode: "CMPN502", totalMarks: 30, date: new Date("2026-08-16") },
+    { name: "DBMS Internal",  type: ExamType.internal,  subjectCode: "CMPN503", totalMarks: 20, date: new Date("2026-08-20") },
+    { name: "ML Mid-Term",    type: ExamType.midterm,   subjectCode: "AI501",   totalMarks: 30, date: new Date("2026-08-18") },
+    { name: "Web Dev Quiz 1", type: ExamType.internal,  subjectCode: "IT501",   totalMarks: 20, date: new Date("2026-08-10") },
   ];
 
-  const exams: Record<string, any> = {};
   for (const e of examData) {
-    const d = new Date(); d.setDate(d.getDate() + e.dayOff);
-    const subPrefix = e.subCode.slice(0, 2);
-    const semKey = subPrefix === "CS" ? "BTECH-CSE-sem5" : subPrefix === "ME" ? "BTECH-ME-sem5" : subPrefix === "EC" ? "BTECH-ECE-sem5" : subPrefix === "CE" ? "BTECH-CE-sem5" : "BTECH-EE-sem5";
-    exams[e.id] = await prisma.exam.upsert({
-      where: { id: e.id },
-      update: {},
-      create: {
-        id: e.id, name: e.name, type: e.type,
-        subjectId: subjects[e.subCode].id, semesterId: semesters[semKey].id,
-        date: d, totalMarks: e.total, createdById: facByEmail[e.facEmail]!,
+    const semId = e.subjectCode.startsWith("CMPN") ? sem5Cmpn : e.subjectCode.startsWith("AI") ? sem5Ai : sem5It;
+    const exam = await prisma.exam.create({
+      data: {
+        name: e.name, type: e.type, totalMarks: e.totalMarks, date: e.date,
+        subjectId: subjects[e.subjectCode].id,
+        semesterId: semId,
+        createdById: admin.id,
+      },
+    });
+
+    // Add results for relevant students
+    const examStudents = e.subjectCode.startsWith("CMPN") ? cmpnAStudents : students.slice(e.subjectCode.startsWith("AI") ? 24 : 12, e.subjectCode.startsWith("AI") ? 30 : 18);
+    for (const stu of examStudents) {
+      const marks = Math.floor(Math.random() * (e.totalMarks * 0.4)) + Math.floor(e.totalMarks * 0.5);
+      const pct = marks / e.totalMarks;
+      const grade = pct >= 0.9 ? Grade.A_PLUS : pct >= 0.8 ? Grade.A : pct >= 0.7 ? Grade.B_PLUS : pct >= 0.6 ? Grade.B : pct >= 0.5 ? Grade.C : Grade.D;
+      await prisma.result.create({
+        data: {
+          examId: exam.id,
+          studentId: stu.id,
+          subjectId: subjects[e.subjectCode].id,
+          semesterId: semId,
+          marksObtained: marks,
+          grade,
+        },
+      });
+    }
+    console.log(`  ✅ ${e.name} — ${examStudents.length} results`);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 13. LEAVE APPLICATIONS
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n📋 Creating leave applications...");
+
+  const leaveData = [
+    { userId: students[0]!.id, type: LeaveType.medical,    startDate: "2026-09-01", endDate: "2026-09-02", reason: "Fever and cold — doctor advised rest", status: ApprovalStatus.approved, approvedById: faculty["fac-cmpn-1"].id },
+    { userId: students[1]!.id, type: LeaveType.personal,   startDate: "2026-09-05", endDate: "2026-09-05", reason: "Family function at hometown",         status: ApprovalStatus.pending },
+    { userId: students[2]!.id, type: LeaveType.medical,    startDate: "2026-08-28", endDate: "2026-08-30", reason: "Dental surgery scheduled",             status: ApprovalStatus.approved, approvedById: faculty["fac-cmpn-2"].id },
+    { userId: faculty["fac-it-1"].id, type: LeaveType.personal, startDate: "2026-09-10", endDate: "2026-09-10", reason: "Personal work", status: ApprovalStatus.pending },
+    { userId: students[12]!.id, type: LeaveType.emergency, startDate: "2026-09-03", endDate: "2026-09-04", reason: "Food poisoning",                      status: ApprovalStatus.rejected },
+  ];
+
+  for (const l of leaveData) {
+    await prisma.leaveApplication.create({
+      data: {
+        userId: l.userId, type: l.type, startDate: new Date(l.startDate), endDate: new Date(l.endDate),
+        reason: l.reason, status: l.status, approvedById: l.approvedById,
       },
     });
   }
-  console.log(`  ✅ ${examData.length} exams created across all departments`);
+  console.log(`  ✅ ${leaveData.length} leave applications`);
 
-  // Generate results for all exams
-  const gradeMap = (pct: number): Grade => {
-    if (pct >= 90) return Grade.A_PLUS;
-    if (pct >= 80) return Grade.A;
-    if (pct >= 70) return Grade.B_PLUS;
-    if (pct >= 60) return Grade.B;
-    if (pct >= 50) return Grade.C;
-    if (pct >= 40) return Grade.D;
-    return Grade.F;
-  };
+  // ══════════════════════════════════════════════════════════════════
+  // 14. ACADEMIC CALENDAR EVENTS
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n📆 Creating academic calendar...");
 
-  // Map exams to the section of students who took them
-  const examStudentMap: { examId: string; subCode: string; sectionStudents: string[] }[] = [
-    // CSE exams — Section A students
-    ...["exam-cs501-mid", "exam-cs501-int", "exam-cs502-mid", "exam-cs503-mid", "exam-cs504-int", "exam-cs505-mid"].map(eid => ({
-      examId: eid, subCode: eid.includes("cs501") ? "CS501" : eid.includes("cs502") ? "CS502" : eid.includes("cs503") ? "CS503" : eid.includes("cs504") ? "CS504" : "CS505",
-      sectionStudents: sectionStudentMap["sec-cse23-A"] || [],
-    })),
-    // ME exams
-    ...["exam-me501-mid", "exam-me502-int", "exam-me503-mid"].map(eid => ({
-      examId: eid, subCode: eid.includes("me501") ? "ME501" : eid.includes("me502") ? "ME502" : "ME503",
-      sectionStudents: sectionStudentMap["sec-me23-A"] || [],
-    })),
-    // ECE exams
-    ...["exam-ec501-mid", "exam-ec502-int", "exam-ec503-mid"].map(eid => ({
-      examId: eid, subCode: eid.includes("ec501") ? "EC501" : eid.includes("ec502") ? "EC502" : "EC503",
-      sectionStudents: sectionStudentMap["sec-ece23-A"] || [],
-    })),
-    // CE exams
-    ...["exam-ce501-mid", "exam-ce502-int"].map(eid => ({
-      examId: eid, subCode: eid.includes("ce501") ? "CE501" : "CE502",
-      sectionStudents: sectionStudentMap["sec-ce23-A"] || [],
-    })),
-    // EE exams
-    ...["exam-ee501-mid", "exam-ee502-int"].map(eid => ({
-      examId: eid, subCode: eid.includes("ee501") ? "EE501" : "EE502",
-      sectionStudents: sectionStudentMap["sec-ee24-A"] || [],
-    })),
+  // Valid AcademicEventType: holiday, exam_period, event, seminar, workshop, sports
+  const calendarData = [
+    { title: "Independence Day",           startDate: "2026-08-15", endDate: "2026-08-15", type: AcademicEventType.holiday },
+    { title: "Mid-Term Examinations",      startDate: "2026-08-25", endDate: "2026-09-05", type: AcademicEventType.exam_period },
+    { title: "Ganesh Chaturthi",           startDate: "2026-09-07", endDate: "2026-09-07", type: AcademicEventType.holiday },
+    { title: "Guest Lecture: AI in India", startDate: "2026-09-15", endDate: "2026-09-15", type: AcademicEventType.seminar },
+    { title: "TechFest 2026",             startDate: "2026-10-01", endDate: "2026-10-03", type: AcademicEventType.event },
+    { title: "Diwali Break",              startDate: "2026-10-20", endDate: "2026-10-25", type: AcademicEventType.holiday },
+    { title: "Coding Workshop",           startDate: "2026-10-28", endDate: "2026-10-28", type: AcademicEventType.workshop },
+    { title: "Sports Day",                startDate: "2026-11-05", endDate: "2026-11-06", type: AcademicEventType.sports },
+    { title: "End-Sem Examinations",      startDate: "2026-11-15", endDate: "2026-11-30", type: AcademicEventType.exam_period },
   ];
 
-  let resCount = 0;
-  for (const mapping of examStudentMap) {
-    const exam = exams[mapping.examId];
-    if (!exam) continue;
-    const subPrefix = mapping.subCode.slice(0, 2);
-    const semKey = subPrefix === "CS" ? "BTECH-CSE-sem5" : subPrefix === "ME" ? "BTECH-ME-sem5" : subPrefix === "EC" ? "BTECH-ECE-sem5" : subPrefix === "CE" ? "BTECH-CE-sem5" : "BTECH-EE-sem5";
-    for (const stuEmail of mapping.sectionStudents) {
-      const stuId = stuByEmail[stuEmail];
-      if (!stuId) continue;
-      const marks = Math.floor(Math.random() * (exam.totalMarks * 0.5)) + (exam.totalMarks * 0.4);
-      try {
-        await prisma.result.create({
-          data: {
-            studentId: stuId, examId: exam.id,
-            subjectId: subjects[mapping.subCode].id,
-            semesterId: semesters[semKey].id,
-            marksObtained: marks, grade: gradeMap((marks / exam.totalMarks) * 100),
-          },
-        });
-        resCount++;
-      } catch { /* skip duplicates */ }
-    }
+  for (const e of calendarData) {
+    await prisma.academicEvent.create({
+      data: {
+        title: e.title,
+        startDate: new Date(e.startDate),
+        endDate: new Date(e.endDate),
+        type: e.type,
+        description: e.title,
+        createdById: admin.id,
+      },
+    });
   }
-  console.log(`  ✅ ${resCount} results created across all departments`);
+  console.log(`  ✅ ${calendarData.length} academic events`);
 
-  // ═══════════════════════════════════════════════════════════════
-  // 17. HOSTELS, ROOMS, ALLOCATIONS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 15. HOSTEL + ROOMS + ALLOCATIONS
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n🏠 Creating hostels...");
 
-  const hostelData = [
-    { id: "hostel-boys-a",  name: "Boys Hostel Block A",  type: HostelType.boys,  wardenEmail: "warden.boys@college.com",  totalRooms: 50 },
-    { id: "hostel-boys-b",  name: "Boys Hostel Block B",  type: HostelType.boys,  wardenEmail: "warden.boys@college.com",  totalRooms: 40 },
-    { id: "hostel-girls-a", name: "Girls Hostel Block A", type: HostelType.girls, wardenEmail: "warden.girls@college.com", totalRooms: 40 },
-    { id: "hostel-girls-b", name: "Girls Hostel Block B", type: HostelType.girls, wardenEmail: "warden.girls@college.com", totalRooms: 30 },
-  ];
+  // Hostel model: id, name, type, wardenId?, totalRooms
+  const hostelBoys = await prisma.hostel.create({
+    data: { id: "hostel-boys", name: "Vidyarthi Boys Hostel", type: HostelType.boys, totalRooms: 50 },
+  });
+  const hostelGirls = await prisma.hostel.create({
+    data: { id: "hostel-girls", name: "Saraswati Girls Hostel", type: HostelType.girls, totalRooms: 40 },
+  });
 
-  const hostels: Record<string, any> = {};
-  for (const h of hostelData) {
-    hostels[h.id] = await prisma.hostel.upsert({
-      where: { id: h.id },
-      update: {},
-      create: { id: h.id, name: h.name, type: h.type, wardenId: wardenByEmail[h.wardenEmail]!, totalRooms: h.totalRooms },
-    });
-    console.log(`  ✅ ${h.name}`);
-  }
-
-  console.log("\n🚪 Creating rooms...");
-  const rooms: Record<string, any> = {};
-  const roomList = [
-    ...Array.from({ length: 10 }, (_, i) => ({ hostelId: "hostel-boys-a", roomNumber: `${101 + i}`, floor: 1, capacity: 2 })),
-    ...Array.from({ length: 10 }, (_, i) => ({ hostelId: "hostel-boys-a", roomNumber: `${201 + i}`, floor: 2, capacity: 2 })),
-    ...Array.from({ length: 5 },  (_, i) => ({ hostelId: "hostel-boys-a", roomNumber: `${301 + i}`, floor: 3, capacity: 3 })),
-    ...Array.from({ length: 10 }, (_, i) => ({ hostelId: "hostel-boys-b", roomNumber: `${101 + i}`, floor: 1, capacity: 2 })),
-    ...Array.from({ length: 10 }, (_, i) => ({ hostelId: "hostel-girls-a", roomNumber: `${101 + i}`, floor: 1, capacity: 2 })),
-    ...Array.from({ length: 10 }, (_, i) => ({ hostelId: "hostel-girls-a", roomNumber: `${201 + i}`, floor: 2, capacity: 2 })),
-    ...Array.from({ length: 5 },  (_, i) => ({ hostelId: "hostel-girls-b", roomNumber: `${101 + i}`, floor: 1, capacity: 2 })),
-  ];
-
-  for (const r of roomList) {
-    const existing = await prisma.hostelRoom.findFirst({ where: { hostelId: r.hostelId, roomNumber: r.roomNumber } });
-    rooms[`${r.hostelId}-${r.roomNumber}`] = existing ?? await prisma.hostelRoom.create({ data: r });
-  }
-  console.log(`  ✅ ${roomList.length} rooms created`);
-
-  console.log("\n🛏️ Allocating students...");
-  const allocations = [
-    // Boys Hostel A
-    { stuEmail: "rahul.sharma@student.com",  roomKey: "hostel-boys-a-101" },
-    { stuEmail: "arjun.patel@student.com",   roomKey: "hostel-boys-a-101" },
-    { stuEmail: "vikram.joshi@student.com",  roomKey: "hostel-boys-a-102" },
-    { stuEmail: "rohit.kumar@student.com",   roomKey: "hostel-boys-a-102" },
-    { stuEmail: "aditya.nair@student.com",   roomKey: "hostel-boys-a-103" },
-    { stuEmail: "harsh.agarwal@student.com", roomKey: "hostel-boys-a-103" },
-    { stuEmail: "manish.tiwari@student.com", roomKey: "hostel-boys-a-201" },
-    { stuEmail: "rajat.saxena@student.com",  roomKey: "hostel-boys-a-201" },
-    { stuEmail: "virat.thakur@student.com",  roomKey: "hostel-boys-a-202" },
-    { stuEmail: "aman.chauhan@student.com",  roomKey: "hostel-boys-a-202" },
-    { stuEmail: "tanmay.sinha@student.com",  roomKey: "hostel-boys-a-203" },
-    { stuEmail: "siddharth.mehta@student.com", roomKey: "hostel-boys-a-203" },
-    // Boys Hostel B
-    { stuEmail: "gaurav.choudhary@student.com", roomKey: "hostel-boys-b-101" },
-    { stuEmail: "nikhil.bhatt@student.com",     roomKey: "hostel-boys-b-101" },
-    { stuEmail: "kunal.banerjee@student.com",   roomKey: "hostel-boys-b-102" },
-    { stuEmail: "akash.rao@student.com",        roomKey: "hostel-boys-b-102" },
-    // Girls Hostel A
-    { stuEmail: "priya.singh@student.com",   roomKey: "hostel-girls-a-101" },
-    { stuEmail: "neha.gupta@student.com",    roomKey: "hostel-girls-a-101" },
-    { stuEmail: "sana.khan@student.com",     roomKey: "hostel-girls-a-102" },
-    { stuEmail: "ananya.mishra@student.com", roomKey: "hostel-girls-a-102" },
-    { stuEmail: "divya.iyer@student.com",    roomKey: "hostel-girls-a-103" },
-    { stuEmail: "kavita.reddy@student.com",  roomKey: "hostel-girls-a-103" },
-    { stuEmail: "megha.das@student.com",     roomKey: "hostel-girls-a-201" },
-    { stuEmail: "ritika.bose@student.com",   roomKey: "hostel-girls-a-201" },
-    { stuEmail: "shreya.menon@student.com",  roomKey: "hostel-girls-a-202" },
-    { stuEmail: "swati.pandey@student.com",  roomKey: "hostel-girls-a-202" },
-    { stuEmail: "nisha.bhat@student.com",    roomKey: "hostel-girls-a-203" },
-    // Girls Hostel B
-    { stuEmail: "pooja.verma@student.com",   roomKey: "hostel-girls-b-101" },
-    { stuEmail: "meera.pillai@student.com",  roomKey: "hostel-girls-b-101" },
-    { stuEmail: "pallavi.jain@student.com",  roomKey: "hostel-girls-b-102" },
-    { stuEmail: "ritu.dey@student.com",      roomKey: "hostel-girls-b-102" },
-    { stuEmail: "aparna.nambiar@student.com", roomKey: "hostel-girls-b-103" },
-  ];
-
-  for (const a of allocations) {
-    const room = rooms[a.roomKey];
-    const stuId = stuByEmail[a.stuEmail]!;
-    if (!room || !stuId) continue;
-    const existing = await prisma.hostelAllocation.findFirst({ where: { studentId: stuId, isActive: true } });
-    if (!existing) {
-      await prisma.hostelAllocation.create({ data: { studentId: stuId, roomId: room.id, allocatedDate: new Date("2024-07-01"), isActive: true } });
+  // Rooms
+  for (let floor = 1; floor <= 3; floor++) {
+    for (let room = 1; room <= 5; room++) {
+      const roomNo = `${floor}0${room}`;
+      await prisma.hostelRoom.create({ data: { roomNumber: `B-${roomNo}`, floor, capacity: 3, hostelId: hostelBoys.id } });
+      await prisma.hostelRoom.create({ data: { roomNumber: `G-${roomNo}`, floor, capacity: 2, hostelId: hostelGirls.id } });
     }
   }
-  console.log(`  ✅ ${allocations.length} students allocated to hostel rooms`);
+  console.log("  ✅ 2 hostels, 30 rooms");
 
-  // ═══════════════════════════════════════════════════════════════
-  // 18. GATE PASSES
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🚶 Creating gate passes...");
-
-  const gpData = [
-    { stuEmail: "rahul.sharma@student.com",  reason: "Going to market for project supplies",      outOff: -2, retOff: -2, outTime: "14:00", retTime: "18:30", status: ApprovalStatus.approved, approverEmail: "warden.boys@college.com" },
-    { stuEmail: "arjun.patel@student.com",   reason: "Medical checkup at city hospital",           outOff: -1, retOff: -1, outTime: "10:00", retTime: "15:00", status: ApprovalStatus.approved, approverEmail: "warden.boys@college.com" },
-    { stuEmail: "vikram.joshi@student.com",  reason: "Going home for weekend",                     outOff: 0,  retOff: 2,  outTime: "16:00", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-    { stuEmail: "priya.singh@student.com",   reason: "Shopping with friends at mall",               outOff: 0,  retOff: 0,  outTime: "15:00", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-    { stuEmail: "rohit.kumar@student.com",   reason: "Want to go to a late night party",           outOff: -3, retOff: -3, outTime: "20:00", retTime: null,    status: ApprovalStatus.rejected, approverEmail: "warden.boys@college.com" },
-    { stuEmail: "manish.tiwari@student.com", reason: "Library visit at central public library",    outOff: 1,  retOff: 1,  outTime: "09:00", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-    { stuEmail: "neha.gupta@student.com",    reason: "Doctor appointment for eye checkup",          outOff: -1, retOff: -1, outTime: "11:00", retTime: "16:00", status: ApprovalStatus.approved, approverEmail: "warden.girls@college.com" },
-    { stuEmail: "megha.das@student.com",     reason: "Going to post office for courier",           outOff: 0,  retOff: 0,  outTime: "10:00", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-    { stuEmail: "aman.chauhan@student.com",  reason: "Cricket practice match at sports complex",   outOff: -2, retOff: -2, outTime: "06:00", retTime: "12:00", status: ApprovalStatus.approved, approverEmail: "warden.boys@college.com" },
-    { stuEmail: "ritika.bose@student.com",   reason: "Visit relative admitted in hospital",        outOff: 1,  retOff: 1,  outTime: "14:00", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-    { stuEmail: "gaurav.choudhary@student.com", reason: "Need to buy textbooks from bookstore",    outOff: -4, retOff: -4, outTime: "10:00", retTime: "14:00", status: ApprovalStatus.approved, approverEmail: "warden.boys@college.com" },
-    { stuEmail: "divya.iyer@student.com",    reason: "Going for bank account opening",             outOff: 2,  retOff: 2,  outTime: "09:30", retTime: null,    status: ApprovalStatus.pending,  approverEmail: null },
-  ];
-
-  for (const g of gpData) {
-    const out = new Date(); out.setDate(out.getDate() + g.outOff);
-    const ret = new Date(); ret.setDate(ret.getDate() + g.retOff);
-    await prisma.gatePass.create({
-      data: {
-        studentId: stuByEmail[g.stuEmail]!, reason: g.reason,
-        outDate: out, outTime: g.outTime, expectedReturnDate: ret, returnTime: g.retTime,
-        status: g.status, approvedById: g.approverEmail ? wardenByEmail[g.approverEmail] : null,
-      },
-    });
+  // Allocate a few students (allocatedDate, not startDate)
+  const boysRoom = await prisma.hostelRoom.findFirst({ where: { hostelId: hostelBoys.id } });
+  const girlsRoom = await prisma.hostelRoom.findFirst({ where: { hostelId: hostelGirls.id } });
+  if (boysRoom) {
+    await prisma.hostelAllocation.create({ data: { studentId: students[0]!.id, roomId: boysRoom.id, allocatedDate: new Date("2026-07-15") } });
+    await prisma.hostelAllocation.create({ data: { studentId: students[2]!.id, roomId: boysRoom.id, allocatedDate: new Date("2026-07-15") } });
   }
-  console.log(`  ✅ ${gpData.length} gate passes created`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // 19. HOSTEL COMPLAINTS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n🔧 Creating hostel complaints...");
-
-  const complaintData = [
-    { stuEmail: "rahul.sharma@student.com",     roomKey: "hostel-boys-a-101",  category: ComplaintCategory.plumbing,   desc: "Bathroom tap leaking continuously, water wastage",         status: ComplaintStatus.open },
-    { stuEmail: "arjun.patel@student.com",      roomKey: "hostel-boys-a-101",  category: ComplaintCategory.electrical, desc: "Ceiling fan not working, making grinding noise",           status: ComplaintStatus.in_progress },
-    { stuEmail: "vikram.joshi@student.com",     roomKey: "hostel-boys-a-102",  category: ComplaintCategory.furniture,  desc: "Study table drawer is broken, cannot store books",         status: ComplaintStatus.resolved },
-    { stuEmail: "priya.singh@student.com",      roomKey: "hostel-girls-a-101", category: ComplaintCategory.cleaning,   desc: "Common washroom not cleaned for 2 days",                   status: ComplaintStatus.open },
-    { stuEmail: "megha.das@student.com",        roomKey: "hostel-girls-a-201", category: ComplaintCategory.electrical, desc: "Power socket sparking near the bed, safety hazard",        status: ComplaintStatus.open },
-    { stuEmail: "manish.tiwari@student.com",    roomKey: "hostel-boys-a-201",  category: ComplaintCategory.other,      desc: "WiFi signal very weak on 2nd floor",                       status: ComplaintStatus.in_progress },
-    { stuEmail: "neha.gupta@student.com",       roomKey: "hostel-girls-a-101", category: ComplaintCategory.plumbing,   desc: "Geyser not working in bathroom",                           status: ComplaintStatus.open },
-    { stuEmail: "aman.chauhan@student.com",     roomKey: "hostel-boys-a-202",  category: ComplaintCategory.furniture,  desc: "Wardrobe door hinge is broken",                            status: ComplaintStatus.open },
-    { stuEmail: "divya.iyer@student.com",       roomKey: "hostel-girls-a-103", category: ComplaintCategory.cleaning,   desc: "Dustbin not collected from corridor for 3 days",           status: ComplaintStatus.resolved },
-    { stuEmail: "gaurav.choudhary@student.com", roomKey: "hostel-boys-b-101",  category: ComplaintCategory.electrical, desc: "Tube light flickering in the room, disturbing sleep",      status: ComplaintStatus.open },
-    { stuEmail: "pallavi.jain@student.com",     roomKey: "hostel-girls-b-102", category: ComplaintCategory.plumbing,   desc: "Water pressure very low on first floor",                   status: ComplaintStatus.in_progress },
-    { stuEmail: "sana.khan@student.com",        roomKey: "hostel-girls-a-102", category: ComplaintCategory.other,      desc: "Room window lock is broken, security concern",             status: ComplaintStatus.open },
-  ];
-
-  for (const c of complaintData) {
-    const room = rooms[c.roomKey];
-    if (!room) continue;
-    await prisma.hostelComplaint.create({
-      data: { studentId: stuByEmail[c.stuEmail]!, roomId: room.id, category: c.category, description: c.desc, status: c.status },
-    });
+  if (girlsRoom) {
+    await prisma.hostelAllocation.create({ data: { studentId: students[1]!.id, roomId: girlsRoom.id, allocatedDate: new Date("2026-07-15") } });
   }
-  console.log(`  ✅ ${complaintData.length} complaints created`);
+  console.log("  ✅ 3 hostel allocations");
 
-  // ═══════════════════════════════════════════════════════════════
-  // 20. ANNOUNCEMENTS
-  // ═══════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════
+  // 16. ANNOUNCEMENTS
+  // ══════════════════════════════════════════════════════════════════
   console.log("\n📢 Creating announcements...");
 
-  const adminId = adminByEmail["admin@college.com"]!;
-  const admin2Id = adminByEmail["registrar@college.com"]!;
-
+  // AnnouncementType: global, department, class, hostel
+  // Announcement fields: title, content, type, targetId?, createdById, scheduledAt?, isPinned?
   const announcements = [
-    { id: "ann-01", title: "Welcome to Semester 5!",                 content: "Dear students, welcome back! Classes begin on August 1st. Please check your timetables on the LMS portal. All students must register on the portal within 3 days.", type: AnnouncementType.global, targetId: null, createdById: adminId, isPinned: true },
-    { id: "ann-02", title: "Mid-Term Exam Schedule Released",        content: "Mid-term examinations will be held from August 20th to August 28th. Students with less than 75% attendance will not be allowed to sit for exams. Check your attendance dashboard.", type: AnnouncementType.global, targetId: null, createdById: adminId, isPinned: true },
-    { id: "ann-03", title: "CSE Department Hackathon 2026",          content: "CSE Department is organizing a 24-hour hackathon on September 15th. Teams of 3-4 can register via the department portal. Prizes worth ₹50,000. Registration deadline: September 10th.", type: AnnouncementType.department, targetId: depts.CSE.id, createdById: facByEmail["amit.verma@college.com"]!, isPinned: false },
-    { id: "ann-04", title: "DSA Extra Doubt Session",                content: "An extra doubt-clearing session for DSA (CS501) will be held on Saturday, 3 PM in Room 301. All students struggling with graph algorithms are encouraged to attend.", type: AnnouncementType.department, targetId: depts.CSE.id, createdById: facByEmail["amit.verma@college.com"]!, isPinned: false },
-    { id: "ann-05", title: "Library Timing Extended",                content: "Central Library timing has been extended to 11 PM during exam period (August 15-30). Students can avail 24x7 reading room facility with valid ID card.", type: AnnouncementType.global, targetId: null, createdById: admin2Id, isPinned: true },
-    { id: "ann-06", title: "Hostel Mess Menu Updated",               content: "The hostel mess menu has been revised based on student feedback. New menu is effective from this Monday. Special Sunday brunch has been added. Check notice board for details.", type: AnnouncementType.hostel, targetId: null, createdById: adminId, isPinned: false },
-    { id: "ann-07", title: "Annual Sports Day Registration Open",    content: "Annual Sports Day will be held on October 5th. Events include athletics, cricket, football, badminton, table tennis, and chess. Register through your section representative by September 25th.", type: AnnouncementType.global, targetId: null, createdById: admin2Id, isPinned: false },
-    { id: "ann-08", title: "ME Workshop on 3D Printing",             content: "Mechanical Engineering Dept. is conducting a hands-on workshop on 3D Printing and Additive Manufacturing on September 20th. Limited seats — register by Sep 18. Certificate will be provided.", type: AnnouncementType.department, targetId: depts.ME.id, createdById: facByEmail["meena.iyer@college.com"]!, isPinned: false },
-    { id: "ann-09", title: "ECE Guest Lecture: 5G Technology",       content: "Guest lecture by Dr. Vikram Sharma from IIT Bombay on 'Future of 5G and Beyond' on September 22nd at 2 PM in Seminar Hall. Open to all ECE students.", type: AnnouncementType.department, targetId: depts.ECE.id, createdById: facByEmail["anita.desai@college.com"]!, isPinned: false },
-    { id: "ann-10", title: "Scholarship Applications Open",          content: "Merit-based scholarships for academic year 2026-27 are now open for applications. Eligibility: CGPA above 8.0 with no backlogs. Apply through the registrar's office by September 30th.", type: AnnouncementType.global, targetId: null, createdById: admin2Id, isPinned: true },
-    { id: "ann-11", title: "Anti-Ragging Cell Notice",               content: "Any form of ragging is a punishable offence. If you witness or experience ragging, report immediately to the Anti-Ragging Cell: antiragging@college.com or call helpline 1800-180-5522.", type: AnnouncementType.global, targetId: null, createdById: adminId, isPinned: true },
-    { id: "ann-12", title: "CE Site Visit to Metro Construction",    content: "Civil Engineering Dept. has organized a site visit to the upcoming metro station construction site on September 25th. Transportation will be arranged. Prior registration mandatory.", type: AnnouncementType.department, targetId: depts.CE.id, createdById: facByEmail["deepak.singh@college.com"]!, isPinned: false },
-    { id: "ann-13", title: "Placement Drive — TCS & Infosys",        content: "TCS and Infosys are visiting campus for placement drive on October 10-12. Eligible: Final year students with CGPA ≥ 6.5. Pre-placement talk on Oct 9 at 4 PM.", type: AnnouncementType.global, targetId: null, createdById: admin2Id, isPinned: false },
-    { id: "ann-14", title: "Water Supply Disruption Notice",         content: "Due to maintenance work on the main pipeline, water supply to Boys Hostel Block A and B will be disrupted on Sunday 9 AM - 2 PM. Students are advised to store water in advance.", type: AnnouncementType.hostel, targetId: null, createdById: adminId, isPinned: false },
-    { id: "ann-15", title: "DBMS Project Submission Extended",       content: "The deadline for DBMS (CS503) project submission has been extended to September 5th. Submit via the course portal. Late submissions will attract 10% penalty per day.", type: AnnouncementType.department, targetId: depts.CSE.id, createdById: facByEmail["sneha.patil@college.com"]!, isPinned: false },
+    { title: "Mid-Term Exam Schedule Released",      content: "The mid-term examination schedule for Sem 5 has been published. Please check the exam section for dates.", type: AnnouncementType.global },
+    { title: "TechFest 2026 Registrations Open",     content: "Register for TechFest 2026 — Hackathon, Paper Presentation, Coding Contest, and more! Last date: Sep 25.", type: AnnouncementType.global, isPinned: true },
+    { title: "Library Timing Extended",              content: "Library will remain open until 10 PM during exam period (Aug 25 - Sep 5).",                                type: AnnouncementType.global },
+    { title: "Placement Drive — Infosys",            content: "Infosys campus placement drive on Oct 10. Eligible: CMPN, IT, AI students with 60%+ aggregate.",          type: AnnouncementType.global, isPinned: true },
+    { title: "Sports Day — Oct 15",                  content: "Annual sports day on Oct 15. Events: Cricket, Football, Badminton, Athletics. Register with your class rep.", type: AnnouncementType.global },
   ];
 
   for (const a of announcements) {
-    await prisma.announcement.upsert({
-      where: { id: a.id },
-      update: {},
-      create: a,
+    await prisma.announcement.create({
+      data: { title: a.title, content: a.content, type: a.type, isPinned: a.isPinned ?? false, createdById: admin.id },
     });
   }
-  console.log(`  ✅ ${announcements.length} announcements created`);
+  console.log(`  ✅ ${announcements.length} announcements`);
 
-  // ═══════════════════════════════════════════════════════════════
-  // 21. ACADEMIC CALENDAR EVENTS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n📆 Creating academic calendar events...");
+  // ══════════════════════════════════════════════════════════════════
+  // 17. ACTIVITY LOG (recent activity for dashboard)
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n📊 Creating activity log...");
 
-  const events = [
-    { title: "Independence Day",               desc: "National holiday. College closed.",                                   start: "2026-08-15", end: "2026-08-15", type: AcademicEventType.holiday },
-    { title: "Ganesh Chaturthi",               desc: "Festival holiday.",                                                   start: "2026-08-27", end: "2026-08-27", type: AcademicEventType.holiday },
-    { title: "Mid-Term Examination Period",     desc: "Mid-term exams for all programs, Semester 5.",                        start: "2026-08-20", end: "2026-08-28", type: AcademicEventType.exam_period },
-    { title: "Gandhi Jayanti",                 desc: "National holiday.",                                                   start: "2026-10-02", end: "2026-10-02", type: AcademicEventType.holiday },
-    { title: "Dussehra",                       desc: "Festival holiday.",                                                   start: "2026-10-12", end: "2026-10-12", type: AcademicEventType.holiday },
-    { title: "Diwali Break",                   desc: "Diwali festival holidays.",                                           start: "2026-10-20", end: "2026-10-24", type: AcademicEventType.holiday },
-    { title: "End Semester Examination Period", desc: "End semester exams for all programs.",                                start: "2026-11-15", end: "2026-11-30", type: AcademicEventType.exam_period },
-    { title: "Christmas & New Year",           desc: "Winter break.",                                                       start: "2026-12-24", end: "2027-01-02", type: AcademicEventType.holiday },
-    { title: "Republic Day",                   desc: "National holiday. Flag hoisting ceremony at 8 AM.",                   start: "2027-01-26", end: "2027-01-26", type: AcademicEventType.holiday },
-    { title: "CSE Hackathon 2026",             desc: "24-hour inter-college hackathon organized by CSE department.",        start: "2026-09-15", end: "2026-09-16", type: AcademicEventType.event,    deptId: depts.CSE.id },
-    { title: "Annual Sports Day",              desc: "Inter-departmental sports competition.",                               start: "2026-10-05", end: "2026-10-05", type: AcademicEventType.sports },
-    { title: "Guest Lecture: 5G Technology",    desc: "By Dr. Vikram Sharma, IIT Bombay. ECE students only.",               start: "2026-09-22", end: "2026-09-22", type: AcademicEventType.seminar,   deptId: depts.ECE.id },
-    { title: "ME 3D Printing Workshop",        desc: "Hands-on workshop on additive manufacturing techniques.",              start: "2026-09-20", end: "2026-09-20", type: AcademicEventType.workshop,  deptId: depts.ME.id },
-    { title: "Technical Symposium — TechFest", desc: "Annual technical symposium with paper presentations and project expo.", start: "2026-10-15", end: "2026-10-17", type: AcademicEventType.event },
-    { title: "CE Site Visit — Metro Project",  desc: "Site visit to metro construction for CE students.",                    start: "2026-09-25", end: "2026-09-25", type: AcademicEventType.event,    deptId: depts.CE.id },
-    { title: "Alumni Meet 2026",               desc: "Annual alumni gathering and networking event.",                        start: "2026-11-08", end: "2026-11-08", type: AcademicEventType.event },
-    { title: "Placement Season Begins",        desc: "Campus placements for final year students.",                           start: "2026-10-10", end: "2026-12-15", type: AcademicEventType.event },
-    { title: "EE Seminar: Smart Grids",        desc: "Seminar on smart grid technology by Prof. from IISc.",                start: "2026-09-28", end: "2026-09-28", type: AcademicEventType.seminar,  deptId: depts.EE.id },
-    { title: "Makar Sankranti / Pongal",       desc: "Festival holiday.",                                                   start: "2027-01-14", end: "2027-01-14", type: AcademicEventType.holiday },
-    { title: "Teachers' Day Celebration",       desc: "Special celebration for Teachers' Day. Half-day classes.",             start: "2026-09-05", end: "2026-09-05", type: AcademicEventType.event },
+  const activityData = [
+    { userId: admin.id,              action: ActivityAction.create, module: ActivityModule.department, description: "Created department: Computer Engineering" },
+    { userId: admin.id,              action: ActivityAction.create, module: ActivityModule.department, description: "Created department: Information Technology" },
+    { userId: admin.id,              action: ActivityAction.create, module: ActivityModule.department, description: "Created department: AI & Data Science" },
+    { userId: faculty["fac-cmpn-1"].id, action: ActivityAction.create, module: ActivityModule.attendance, description: "Marked attendance for CMPN501 — Section A" },
+    { userId: faculty["fac-it-1"].id,   action: ActivityAction.create, module: ActivityModule.attendance, description: "Marked attendance for IT501 — Section A" },
+    { userId: admin.id,              action: ActivityAction.create, module: ActivityModule.exam,       description: "Created exam: DSA Mid-Term" },
+    { userId: students[0]!.id,       action: ActivityAction.create, module: ActivityModule.leave,      description: "Applied for medical leave (Sep 1-2)" },
+    { userId: admin.id,              action: ActivityAction.update, module: ActivityModule.student,    description: "Updated student records" },
   ];
 
-  for (const e of events) {
-    await prisma.academicEvent.create({
-      data: {
-        title: e.title, description: e.desc,
-        startDate: new Date(e.start), endDate: new Date(e.end),
-        type: e.type,
-        departmentId: (e as any).deptId || null,
-        createdById: adminId,
-      },
-    });
+  for (const a of activityData) {
+    await prisma.activityLog.create({ data: a });
   }
-  console.log(`  ✅ ${events.length} calendar events created`);
+  console.log(`  ✅ ${activityData.length} activity log entries`);
 
-  // ═══════════════════════════════════════════════════════════════
-  // 22. ACTIVITY LOGS
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n📊 Creating activity log entries...");
-
-  const activityLogs = [
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.department, entityType: "Department", desc: "Dr. Rajesh Kumar (admin) created department 'Computer Science & Engineering'" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.department, entityType: "Department", desc: "Dr. Rajesh Kumar (admin) created department 'Mechanical Engineering'" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.department, entityType: "Department", desc: "Dr. Rajesh Kumar (admin) created department 'Electronics & Communication Engineering'" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.student, entityType: "User", desc: "Dr. Rajesh Kumar (admin) registered 32 new students for academic year 2026-27" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.faculty, entityType: "User", desc: "Dr. Rajesh Kumar (admin) registered 12 faculty members" },
-    { userId: facByEmail["amit.verma@college.com"]!, action: ActivityAction.create, module: ActivityModule.attendance, entityType: "Attendance", desc: "Prof. Amit Verma marked attendance for CS501 — Section A (6 students present, 0 absent)" },
-    { userId: facByEmail["sneha.patil@college.com"]!, action: ActivityAction.create, module: ActivityModule.attendance, entityType: "Attendance", desc: "Dr. Sneha Patil marked attendance for CS502 — Section A (5 present, 1 late)" },
-    { userId: facByEmail["amit.verma@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Exam", desc: "Prof. Amit Verma created exam 'DSA Mid-Term' for CS501" },
-    { userId: facByEmail["amit.verma@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Result", desc: "Prof. Amit Verma entered marks for 6 students — DSA Mid-Term" },
-    { userId: facByEmail["sneha.patil@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Exam", desc: "Dr. Sneha Patil created exam 'OS Mid-Term' for CS502" },
-    { userId: facByEmail["meena.iyer@college.com"]!, action: ActivityAction.create, module: ActivityModule.attendance, entityType: "Attendance", desc: "Dr. Meena Iyer marked attendance for ME501 — Section A" },
-    { userId: facByEmail["anita.desai@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Exam", desc: "Dr. Anita Desai created exam 'DSP Mid-Term' for EC501" },
-    { userId: facByEmail["amit.verma@college.com"]!, action: ActivityAction.approve, module: ActivityModule.leave, entityType: "LeaveApplication", desc: "Prof. Amit Verma approved leave for Rahul Sharma (medical)" },
-    { userId: facByEmail["ravi.krishnan@college.com"]!, action: ActivityAction.reject, module: ActivityModule.leave, entityType: "LeaveApplication", desc: "Prof. Ravi Krishnan rejected leave for Ananya Mishra (cannot approve during exam week)" },
-    { userId: wardenByEmail["warden.boys@college.com"]!, action: ActivityAction.approve, module: ActivityModule.hostel, entityType: "GatePass", desc: "Mr. Ramesh Yadav approved gate pass for Rahul Sharma" },
-    { userId: wardenByEmail["warden.boys@college.com"]!, action: ActivityAction.reject, module: ActivityModule.hostel, entityType: "GatePass", desc: "Mr. Ramesh Yadav rejected gate pass for Rohit Kumar (late night party not allowed)" },
-    { userId: wardenByEmail["warden.girls@college.com"]!, action: ActivityAction.approve, module: ActivityModule.hostel, entityType: "GatePass", desc: "Mrs. Sunita Devi approved gate pass for Neha Gupta (doctor appointment)" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.announcement, entityType: "Announcement", desc: "Dr. Rajesh Kumar (admin) created announcement 'Mid-Term Exam Schedule Released'" },
-    { userId: admin2Id, action: ActivityAction.create, module: ActivityModule.announcement, entityType: "Announcement", desc: "Mrs. Priya Sharma (registrar) created announcement 'Scholarship Applications Open'" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.calendar, entityType: "AcademicEvent", desc: "Dr. Rajesh Kumar (admin) added 'Mid-Term Examination Period' to calendar" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.calendar, entityType: "AcademicEvent", desc: "Dr. Rajesh Kumar (admin) added 'Diwali Break' to calendar" },
-    { userId: facByEmail["deepak.singh@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Exam", desc: "Dr. Deepak Singh created exam 'Structural Mid-Term' for CE501" },
-    { userId: facByEmail["pooja.nair@college.com"]!, action: ActivityAction.create, module: ActivityModule.exam, entityType: "Exam", desc: "Prof. Pooja Nair created exam 'Power Systems Mid-Term' for EE501" },
-    { userId: adminId, action: ActivityAction.update, module: ActivityModule.timetable, entityType: "TimetableSlot", desc: "Dr. Rajesh Kumar (admin) updated timetable — Room change for CS504 to Room 302" },
-    { userId: facByEmail["sneha.patil@college.com"]!, action: ActivityAction.create, module: ActivityModule.announcement, entityType: "Announcement", desc: "Dr. Sneha Patil created announcement 'DBMS Project Submission Extended'" },
-    { userId: adminId, action: ActivityAction.login, module: ActivityModule.auth, entityType: "Session", desc: "Dr. Rajesh Kumar (admin) logged in" },
-    { userId: facByEmail["amit.verma@college.com"]!, action: ActivityAction.login, module: ActivityModule.auth, entityType: "Session", desc: "Prof. Amit Verma (faculty) logged in" },
-    { userId: stuByEmail["rahul.sharma@student.com"]!, action: ActivityAction.login, module: ActivityModule.auth, entityType: "Session", desc: "Rahul Sharma (student) logged in" },
-    { userId: wardenByEmail["warden.boys@college.com"]!, action: ActivityAction.login, module: ActivityModule.auth, entityType: "Session", desc: "Mr. Ramesh Yadav (warden) logged in" },
-    { userId: admin2Id, action: ActivityAction.login, module: ActivityModule.auth, entityType: "Session", desc: "Mrs. Priya Sharma (admin) logged in" },
-    { userId: facByEmail["meena.iyer@college.com"]!, action: ActivityAction.approve, module: ActivityModule.leave, entityType: "LeaveApplication", desc: "Dr. Meena Iyer approved leave for Manish Tiwari (food poisoning)" },
-    { userId: facByEmail["meena.iyer@college.com"]!, action: ActivityAction.approve, module: ActivityModule.leave, entityType: "LeaveApplication", desc: "Dr. Meena Iyer approved leave for Swati Pandey (father's accident — emergency)" },
-    { userId: facByEmail["kiran.joshi@college.com"]!, action: ActivityAction.approve, module: ActivityModule.leave, entityType: "LeaveApplication", desc: "Prof. Kiran Joshi approved leave for Aman Chauhan (university sports day)" },
-    { userId: adminId, action: ActivityAction.create, module: ActivityModule.hostel, entityType: "Hostel", desc: "Dr. Rajesh Kumar (admin) created hostel 'Girls Hostel Block B'" },
-    { userId: adminId, action: ActivityAction.update, module: ActivityModule.system, entityType: "System", desc: "System maintenance: database backup completed successfully" },
-  ];
-
-  for (let i = 0; i < activityLogs.length; i++) {
-    const a = activityLogs[i]!;
-    const created = new Date();
-    created.setMinutes(created.getMinutes() - (activityLogs.length - i) * 45); // spread across time
-    await prisma.activityLog.create({
-      data: {
-        userId: a.userId, action: a.action, module: a.module,
-        entityType: a.entityType, description: a.desc,
-        ipAddress: "192.168.1." + (10 + Math.floor(Math.random() * 240)),
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        createdAt: created,
-      },
-    });
-  }
-  console.log(`  ✅ ${activityLogs.length} activity log entries created`);
-
-  // ═══════════════════════════════════════════════════════════════
-  // DONE!
-  // ═══════════════════════════════════════════════════════════════
-  console.log("\n═══════════════════════════════════════════════════════════");
-  console.log("  🎉 SEEDING COMPLETE!");
-  console.log("═══════════════════════════════════════════════════════════");
-  console.log("\nCredentials (all use password: password123):");
-  console.log("   admin@college.com         / password123");
-  console.log("   registrar@college.com     / password123");
-  console.log("   amit.verma@college.com    / password123  (CSE faculty)");
-  console.log("   sneha.patil@college.com   / password123  (CSE faculty)");
-  console.log("   meena.iyer@college.com    / password123  (ME faculty)");
-  console.log("   anita.desai@college.com   / password123  (ECE faculty)");
-  console.log("   deepak.singh@college.com  / password123  (CE faculty)");
-  console.log("   pooja.nair@college.com    / password123  (EE faculty)");
-  console.log("   warden.boys@college.com   / password123  (boys warden)");
-  console.log("   warden.girls@college.com  / password123  (girls warden)");
-  console.log("   rahul.sharma@student.com  / password123  (CSE student)");
-  console.log("   priya.singh@student.com   / password123  (CSE student)");
-  console.log("   manish.tiwari@student.com / password123  (ME student)");
-  console.log("   megha.das@student.com     / password123  (ECE student)");
-  console.log("   gaurav.choudhary@student.com / password123  (CE student)");
-  console.log("   ritu.dey@student.com      / password123  (EE student)");
-  console.log("═══════════════════════════════════════════════════════════\n");
+  // ══════════════════════════════════════════════════════════════════
+  // DONE
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n" + "═".repeat(60));
+  console.log("🎉 SEED COMPLETE!");
+  console.log("═".repeat(60));
+  console.log("\n📊 Summary:");
+  console.log("  • 3 Departments: CMPN, IT, AIDS");
+  console.log("  • 3 Programs (B.Tech, 4yr each)");
+  console.log("  • 6 Batches, 8 Sections");
+  console.log("  • 24 Semesters (1-8 per program)");
+  console.log("  • 40 Subjects (14 CMPN + 13 IT + 13 AI — Sem 3 & Sem 5)");
+  console.log("  • 1 Admin, 18 Faculty, 48 Students");
+  console.log(`  • ${fsData.length} Faculty-Subject assignments (timetable ready!)`);
+  console.log(`  • ${attCount} Attendance records`);
+  console.log("  • 5 Exams with results");
+  console.log("  • 5 Leave applications");
+  console.log("  • 9 Academic calendar events");
+  console.log("  • 2 Hostels, 30 rooms, 3 allocations");
+  console.log("  • 5 Announcements");
+  console.log("\n🔑 Login Credentials:");
+  console.log("  Admin:   admin@college.com / password123");
+  console.log("  Faculty: amit.verma@college.com / password123");
+  console.log("  Student: aarav.sharma@student.college.com / password123");
+  console.log("\n🤖 Timetable Auto-Generate:");
+  console.log("  Ready! All 8 sections can auto-generate timetables:");
+  console.log("  • 2023 batch → Sem 5 (CMPN-A, CMPN-B, IT-A, IT-B, AI-A)");
+  console.log("  • 2024 batch → Sem 3 (CMPN-24A, IT-24A, AI-24A)");
+  console.log("  CMPN-A & CMPN-B, IT-A & IT-B share faculty = cross-section conflict test!\n");
 }
 
 main()
+  .then(() => prisma.$disconnect())
   .catch((e) => {
-    console.error("❌ Seeding failed:", e);
+    console.error("❌ Seed failed:", e);
+    prisma.$disconnect();
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });

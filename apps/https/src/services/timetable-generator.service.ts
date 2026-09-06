@@ -391,10 +391,27 @@ function attemptPlacement(
       let found = false;
 
       // S1: Prefer days not yet used by this subject (even distribution)
-      const candidateDays = [
-        ...WORKING_DAYS.filter((d) => !task.daysUsed.has(d)),
-        ...WORKING_DAYS.filter((d) => task.daysUsed.has(d)),
-      ];
+      // S3: Among equally-prioritized days, prefer least-loaded day (balance)
+      // This prevents the greedy algorithm from filling Mon-Thu and leaving Friday empty
+      const dayLoadCount = (day: number): number => {
+        let count = 0;
+        for (const k of sectionBusy) {
+          if (k.startsWith(`${day}-`)) count++;
+        }
+        for (const p of placed) {
+          if (p.day === day) count++;
+        }
+        return count;
+      };
+
+      const candidateDays = [...WORKING_DAYS].sort((a, b) => {
+        // Primary: unused days first for this subject (S1: spread)
+        const aUsed = task.daysUsed.has(a) ? 1 : 0;
+        const bUsed = task.daysUsed.has(b) ? 1 : 0;
+        if (aUsed !== bUsed) return aUsed - bUsed;
+        // Secondary: least-loaded day first (S3: balance across week)
+        return dayLoadCount(a) - dayLoadCount(b);
+      });
 
       outerLoop: for (const day of candidateDays) {
         // H5 + S3: Check if day is full (max 3 slots per day per section)

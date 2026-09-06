@@ -7,6 +7,7 @@ export const programService = {
     return prisma.program.findMany({
       include: {
         department: { select: { id: true, name: true, code: true } },
+        semesters: { select: { id: true, number: true }, orderBy: { number: "asc" } },
         _count: { select: { batches: true, semesters: true } },
       },
       orderBy: { name: "asc" },

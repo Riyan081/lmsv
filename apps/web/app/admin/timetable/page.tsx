@@ -26,12 +26,13 @@ export default async function AdminTimetablePage() {
   }
 
   // Extract all unique sections from batches
-  const sections: { id: string; label: string }[] = [];
+  const sections: { id: string; label: string; programCode: string }[] = [];
   batches.forEach((b: any) => {
     (b.sections || []).forEach((s: any) => {
       sections.push({
         id: s.id,
         label: `${b.program?.code || ""} ${b.name} — Sec ${s.name}`,
+        programCode: b.program?.code || "",
       });
     });
   });

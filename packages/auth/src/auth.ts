@@ -21,6 +21,9 @@ export const auth = betterAuth({
   // ─── App Identity ────────────────────────────────────────────
   appName: "University LMS",
 
+  // ─── Base URL (required for correct path matching) ──────────
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+
   // ─── Trusted Origins (CSRF whitelist) ────────────────────────
   trustedOrigins: process.env.TRUSTED_ORIGINS
     ? process.env.TRUSTED_ORIGINS.split(",")
@@ -177,16 +180,19 @@ export const auth = betterAuth({
 
           // Log login activity
           try {
+            // Better Auth may pass userId in different places depending on version
+            const userId = data?.userId || data?.user?.id || hookData?.userId;
+
             // Fetch user name for a meaningful description
-            const user = data?.userId
-              ? await prisma.user.findUnique({ where: { id: data.userId }, select: { name: true, role: true } })
+            const user = userId
+              ? await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
               : null;
-            const displayName = user?.name ?? "Unknown user";
+            const displayName = user?.name || data?.user?.name || "System";
             const role = user?.role ? ` (${user.role})` : "";
 
             await prisma.activityLog.create({
               data: {
-                userId: data?.userId,
+                userId: userId || undefined,
                 action: "login",
                 module: "auth",
                 entityType: "Session",
