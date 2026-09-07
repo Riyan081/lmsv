@@ -1,19 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function CreateHostelForm() {
+export default function CreateHostelForm({ wardens = [] }: { wardens?: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [wardenList, setWardenList] = useState<{ id: string; name: string }[]>(wardens);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    if (wardens.length > 0) {
+      setWardenList(wardens);
+    }
+  }, [wardens]);
+
+  useEffect(() => {
+    if (open) {
+      fetch("http://localhost:3001/api/users?role=warden", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.data)) {
+            setWardenList(data.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     const form = new FormData(e.currentTarget);
+    const wardenId = form.get("wardenId") as string;
 
     try {
       const res = await fetch("http://localhost:3001/api/hostel", {
@@ -23,16 +44,26 @@ export default function CreateHostelForm() {
         body: JSON.stringify({
           name: form.get("name"),
           type: form.get("type"),
-          address: form.get("address") || undefined,
+          wardenId: wardenId || undefined,
+          totalRooms: parseInt((form.get("totalRooms") as string) || "0", 10),
         }),
       });
       const data = await res.json();
-      if (!data.success) { setError(data.error || "Failed"); return; }
+      if (!data.success) {
+        setError(data.error || "Failed to create hostel");
+        return;
+      }
       setOpen(false);
       router.refresh();
-    } catch { setError("Failed to connect"); }
-    finally { setLoading(false); }
+    } catch {
+      setError("Failed to connect to server");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const inputCls = "w-full px-4 py-2.5 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors";
+  const inputStyle = { borderColor: "var(--color-border)", color: "var(--color-text-primary)" };
 
   if (!open) return <button onClick={() => setOpen(true)} className="btn-gradient text-sm">+ Add Hostel</button>;
 
@@ -43,24 +74,32 @@ export default function CreateHostelForm() {
         {error && <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Name *</label>
-            <input name="name" required placeholder="e.g., Boys Hostel A"
-              className="w-full px-4 py-2.5 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors"
-              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }} />
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Hostel Name *</label>
+            <input name="name" required placeholder="e.g., Boys Hostel Block A"
+              className={inputCls}
+              style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Hostel Type *</label>
+              <select name="type" className={inputCls} style={inputStyle}>
+                <option value="boys">Boys</option>
+                <option value="girls">Girls</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Expected Rooms</label>
+              <input name="totalRooms" type="number" min={0} defaultValue={0} className={inputCls} style={inputStyle} />
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Type</label>
-            <select name="type" className="w-full px-4 py-2.5 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors"
-              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}>
-              <option value="boys">Boys</option>
-              <option value="girls">Girls</option>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Assigned Warden</label>
+            <select name="wardenId" className={inputCls} style={inputStyle}>
+              <option value="">Select Warden (Optional)...</option>
+              {wardenList.map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--color-text-secondary)" }}>Address</label>
-            <input name="address" placeholder="Optional address"
-              className="w-full px-4 py-2.5 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors"
-              style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }} />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => setOpen(false)}

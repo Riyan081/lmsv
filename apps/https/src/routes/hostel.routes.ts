@@ -10,8 +10,8 @@ import {
 const router = Router();
 router.use(requireAuth);
 
-// ─── Hostels (Admin/Warden) ─────────────────────────────────
-router.get("/", requireRole("admin", "warden"), asyncHandler(hostelController.getAllHostels));
+// ─── Hostels ────────────────────────────────────────────────
+router.get("/", requireRole("admin", "warden", "student"), asyncHandler(hostelController.getAllHostels));
 router.post("/", requireRole("admin"), validate(createHostelSchema), asyncHandler(hostelController.createHostel));
 
 // ─── Rooms (Admin/Warden) ───────────────────────────────────
@@ -24,12 +24,12 @@ router.patch("/allocate/:id/vacate", requireRole("admin", "warden"), asyncHandle
 
 // ─── Gate Pass ──────────────────────────────────────────────
 router.post("/gate-pass", requireRole("student"), validate(createGatePassSchema), asyncHandler(hostelController.createGatePass));
-router.get("/gate-pass", requireRole("admin", "warden"), asyncHandler(hostelController.getGatePasses));
+router.get("/gate-pass", requireRole("admin", "warden", "student"), asyncHandler(hostelController.getGatePasses));
 router.patch("/gate-pass/:id/status", requireRole("admin", "warden"), validate(updateGatePassStatusSchema), asyncHandler(hostelController.updateGatePassStatus));
 
 // ─── Complaints ─────────────────────────────────────────────
 router.post("/complaints", requireRole("student"), validate(createComplaintSchema), asyncHandler(hostelController.createComplaint));
-router.get("/complaints", requireRole("admin", "warden"), asyncHandler(hostelController.getComplaints));
+router.get("/complaints", requireRole("admin", "warden", "student"), asyncHandler(hostelController.getComplaints));
 router.patch("/complaints/:id/status", requireRole("admin", "warden"), validate(updateComplaintStatusSchema), asyncHandler(hostelController.updateComplaintStatus));
 
 export default router;

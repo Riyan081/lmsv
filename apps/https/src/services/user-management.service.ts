@@ -52,10 +52,22 @@ export const userManagementService = {
         department: true,
         batch: { include: { program: true } },
         section: true,
+        hostelAllocations: {
+          include: {
+            room: {
+              include: { hostel: true },
+            },
+          },
+        },
       },
     });
     if (!user) throw new NotFoundError("User");
     return user;
+  },
+
+  /** Get complete profile of authenticated user */
+  async getProfile(id: string) {
+    return this.getById(id);
   },
 
   /**

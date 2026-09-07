@@ -22,6 +22,7 @@ const NAV_CONFIG: Record<string, NavGroup[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "📊" },
+        { label: "My Profile", href: "/profile", icon: "👤" },
         { label: "Activity Log", href: "/admin/activity-log", icon: "📋" },
       ],
     },
@@ -59,6 +60,7 @@ const NAV_CONFIG: Record<string, NavGroup[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "📊" },
+        { label: "My Profile", href: "/profile", icon: "👤" },
       ],
     },
     {
@@ -83,6 +85,7 @@ const NAV_CONFIG: Record<string, NavGroup[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "📊" },
+        { label: "My Profile", href: "/profile", icon: "👤" },
       ],
     },
     {
@@ -108,6 +111,7 @@ const NAV_CONFIG: Record<string, NavGroup[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "📊" },
+        { label: "My Profile", href: "/profile", icon: "👤" },
       ],
     },
     {

@@ -530,6 +530,97 @@ async function main() {
   console.log("  📌 2024 batch sections (sem3) have dedicated junior faculty");
 
   // ══════════════════════════════════════════════════════════════════
+  // 10b. GENERATE TIMETABLES (for all 8 sections)
+  // ══════════════════════════════════════════════════════════════════
+  console.log("\n🗓️ Generating weekly timetables for all 8 sections...");
+
+  const SLOTS = [
+    { start: "09:00", end: "11:00" },
+    { start: "11:15", end: "13:15" },
+    { start: "13:45", end: "15:45" },
+  ];
+  const DAYS = [0, 1, 2, 3, 4]; // Mon-Fri
+
+  const facultyBusy = new Map<string, Set<string>>(); // facultyId -> Set of "day-slotIdx"
+
+  let totalSlotsCreated = 0;
+
+  const sectionsToGenerate = [
+    { sectionKey: "sec-cmpn23-A", semId: sem5Cmpn, room: "LH-101" },
+    { sectionKey: "sec-cmpn23-B", semId: sem5Cmpn, room: "LH-102" },
+    { sectionKey: "sec-it23-A",   semId: sem5It,   room: "LH-201" },
+    { sectionKey: "sec-it23-B",   semId: sem5It,   room: "LH-202" },
+    { sectionKey: "sec-ai23-A",   semId: sem5Ai,   room: "LH-301" },
+    { sectionKey: "sec-cmpn24-A", semId: sem3Cmpn, room: "LH-103" },
+    { sectionKey: "sec-it24-A",   semId: sem3It,   room: "LH-203" },
+    { sectionKey: "sec-ai24-A",   semId: sem3Ai,   room: "LH-302" },
+  ];
+
+  for (const item of sectionsToGenerate) {
+    const secId = sections[item.sectionKey].id;
+    const assignments = fsData.filter((f) => f.sectionId === secId && f.semesterId === item.semId);
+
+    const tasks: { subjectId: string; facultyId: string; slotsNeeded: number; daysUsed: Set<number> }[] = [];
+    for (const a of assignments) {
+      tasks.push({
+        subjectId: a.subjectId,
+        facultyId: a.facultyId,
+        slotsNeeded: 2,
+        daysUsed: new Set<number>(),
+      });
+    }
+
+    const sectionBusy = new Set<string>(); // "day-slotIdx"
+
+    for (const task of tasks) {
+      if (!facultyBusy.has(task.facultyId)) facultyBusy.set(task.facultyId, new Set<string>());
+      const fBusy = facultyBusy.get(task.facultyId)!;
+
+      while (task.slotsNeeded > 0) {
+        let placed = false;
+        const dayOrder = [...DAYS].sort((d1, d2) => {
+          const used1 = task.daysUsed.has(d1) ? 1 : 0;
+          const used2 = task.daysUsed.has(d2) ? 1 : 0;
+          return used1 - used2;
+        });
+
+        for (const day of dayOrder) {
+          for (let slotIdx = 0; slotIdx < SLOTS.length; slotIdx++) {
+            const key = `${day}-${slotIdx}`;
+            if (!sectionBusy.has(key) && !fBusy.has(key)) {
+              sectionBusy.add(key);
+              fBusy.add(key);
+              task.daysUsed.add(day);
+              task.slotsNeeded--;
+
+              await prisma.timetableSlot.create({
+                data: {
+                  dayOfWeek: day,
+                  startTime: SLOTS[slotIdx]!.start,
+                  endTime: SLOTS[slotIdx]!.end,
+                  room: item.room,
+                  subjectId: task.subjectId,
+                  facultyId: task.facultyId,
+                  sectionId: secId,
+                  semesterId: item.semId,
+                },
+              });
+              totalSlotsCreated++;
+              placed = true;
+              break;
+            }
+          }
+          if (placed) break;
+        }
+
+        if (!placed) break;
+      }
+    }
+    console.log(`  ✅ Generated timetable for ${item.sectionKey}`);
+  }
+  console.log(`  📊 Total ${totalSlotsCreated} timetable slots created across all sections`);
+
+  // ══════════════════════════════════════════════════════════════════
   // 11. ATTENDANCE — last 2 weeks for ALL sections (realistic coverage)
   //     Each section gets attendance for their own 3 theory subjects
   //     with the correct faculty who teaches them.

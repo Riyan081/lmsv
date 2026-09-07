@@ -15,6 +15,13 @@ export const userManagementController = {
     sendSuccess(res, `${role}s retrieved`, users);
   },
 
+  /** GET /api/users/me */
+  getProfile: async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id;
+    const profile = await userManagementService.getProfile(userId);
+    sendSuccess(res, "Profile retrieved", profile);
+  },
+
   /** GET /api/users/:id */
   getById: async (req: Request, res: Response) => {
     const user = await userManagementService.getById(req.params.id as string);

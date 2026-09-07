@@ -20,12 +20,21 @@ export const timetableService = {
     });
   },
 
-  async getBySection(sectionId: string, semesterId: string) {
+  async getBySection(sectionId: string, semesterId?: string) {
+    const where: any = { sectionId };
+    if (semesterId) where.semesterId = semesterId;
     return prisma.timetableSlot.findMany({
-      where: { sectionId, semesterId },
+      where,
       include: {
         subject: { select: { id: true, name: true, code: true } },
         faculty: { select: { id: true, name: true } },
+        section: {
+          select: {
+            id: true,
+            name: true,
+            batch: { select: { name: true, program: { select: { name: true, code: true } } } },
+          },
+        },
       },
       orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
     });

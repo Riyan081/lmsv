@@ -15,6 +15,7 @@ export const hostelService = {
     return prisma.hostel.findMany({
       include: {
         warden: { select: { id: true, name: true } },
+        rooms: { select: { id: true, roomNumber: true, floor: true, capacity: true } },
         _count: { select: { rooms: true } },
       },
     });
@@ -29,7 +30,22 @@ export const hostelService = {
     return prisma.hostelRoom.findMany({
       where: { hostelId },
       include: {
-        allocations: { where: { isActive: true }, include: { student: { select: { id: true, name: true, enrollmentNo: true } } } },
+        allocations: {
+          where: { isActive: true },
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                enrollmentNo: true,
+                email: true,
+                batch: { select: { id: true, name: true, startYear: true, endYear: true } },
+                department: { select: { id: true, name: true, code: true } },
+                section: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
         _count: { select: { allocations: { where: { isActive: true } } } },
       },
       orderBy: [{ floor: "asc" }, { roomNumber: "asc" }],
@@ -45,15 +61,32 @@ export const hostelService = {
     if (!room) throw new NotFoundError("Room");
     if (room._count.allocations >= room.capacity) throw new BadRequestError("Room is at full capacity");
 
+    // Find student by ID, enrollment number, or email
+    const studentUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: data.studentId },
+          { enrollmentNo: data.studentId },
+          { email: data.studentId },
+        ],
+        role: "student",
+      },
+    });
+    if (!studentUser) throw new NotFoundError("Student (enter a valid Student ID, Enrollment No, or Email)");
+
     // Check if student already has active allocation
     const existing = await prisma.hostelAllocation.findFirst({
-      where: { studentId: data.studentId, isActive: true },
+      where: { studentId: studentUser.id, isActive: true },
     });
     if (existing) throw new BadRequestError("Student already has an active room allocation");
 
     return prisma.hostelAllocation.create({
-      data: { ...data, allocatedDate: new Date(data.allocatedDate) },
-      include: { student: { select: { id: true, name: true } }, room: true },
+      data: {
+        roomId: data.roomId,
+        studentId: studentUser.id,
+        allocatedDate: new Date(data.allocatedDate),
+      },
+      include: { student: { select: { id: true, name: true, enrollmentNo: true } }, room: true },
     });
   },
 
@@ -116,9 +149,10 @@ export const hostelService = {
     return prisma.hostelComplaint.create({ data: { ...data, studentId } });
   },
 
-  async getComplaints(filters: { status?: string; hostelId?: string; page?: number; limit?: number }) {
+  async getComplaints(filters: { studentId?: string; status?: string; hostelId?: string; page?: number; limit?: number }) {
     const { page = 1, limit = 20 } = filters;
     const where: any = {};
+    if (filters.studentId) where.studentId = filters.studentId;
     if (filters.status) where.status = filters.status;
     if (filters.hostelId) where.room = { hostelId: filters.hostelId };
 
@@ -126,7 +160,7 @@ export const hostelService = {
       prisma.hostelComplaint.findMany({
         where,
         include: {
-          student: { select: { id: true, name: true } },
+          student: { select: { id: true, name: true, enrollmentNo: true } },
           room: { select: { roomNumber: true, hostel: { select: { name: true } } } },
         },
         orderBy: { createdAt: "desc" },

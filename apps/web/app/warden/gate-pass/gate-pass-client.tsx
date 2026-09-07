@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -11,20 +11,39 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function GatePassClient({ passes }: { passes: any[] }) {
   const router = useRouter();
+  const [passList, setPassList] = useState<any[]>(passes);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [search, setSearch] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const filtered = filter === "all" ? passes : passes.filter((p) => p.status === filter);
+  useEffect(() => {
+    setPassList(passes);
+  }, [passes]);
+
+  const filtered = passList.filter((p) => {
+    if (filter !== "all" && p.status !== filter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchName = p.student?.name?.toLowerCase().includes(q);
+      const matchEnroll = p.student?.enrollmentNo?.toLowerCase().includes(q);
+      const matchReason = p.reason?.toLowerCase().includes(q);
+      if (!matchName && !matchEnroll && !matchReason) return false;
+    }
+    return true;
+  });
 
   const counts = {
-    all: passes.length,
-    pending: passes.filter((p) => p.status === "pending").length,
-    approved: passes.filter((p) => p.status === "approved").length,
-    rejected: passes.filter((p) => p.status === "rejected").length,
+    all: passList.length,
+    pending: passList.filter((p) => p.status === "pending").length,
+    approved: passList.filter((p) => p.status === "approved").length,
+    rejected: passList.filter((p) => p.status === "rejected").length,
   };
 
   const handleStatus = async (id: string, status: "approved" | "rejected") => {
     setUpdating(id);
+    // Optimistically update UI immediately
+    setPassList((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+
     try {
       const res = await fetch(`http://localhost:3001/api/hostel/gate-pass/${id}/status`, {
         method: "PATCH",
@@ -33,8 +52,16 @@ export default function GatePassClient({ passes }: { passes: any[] }) {
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
-      if (data.success) router.refresh();
-      else alert(data.error || "Failed to update");
+      if (data.success) {
+        router.refresh();
+      } else {
+        // Revert on error
+        setPassList(passes);
+        alert(data.error || "Failed to update gate pass status");
+      }
+    } catch {
+      setPassList(passes);
+      alert("Failed to connect to server");
     } finally {
       setUpdating(null);
     }
@@ -42,27 +69,38 @@ export default function GatePassClient({ passes }: { passes: any[] }) {
 
   return (
     <div className="space-y-5">
-      {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {(["all", "pending", "approved", "rejected"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
-              filter === f ? "btn-gradient border-transparent" : "hover:bg-white/5"
-            }`}
-            style={filter !== f ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : {}}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}{" "}
-            <span className="ml-1 text-xs opacity-70">({counts[f]})</span>
-          </button>
-        ))}
+      {/* Search and Filter tabs */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {(["all", "pending", "approved", "rejected"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors border ${
+                filter === f ? "btn-gradient border-transparent" : "hover:bg-white/5"
+              }`}
+              style={filter !== f ? { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" } : {}}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}{" "}
+              <span className="ml-1 text-xs opacity-70">({counts[f]})</span>
+            </button>
+          ))}
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search student or reason..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="px-4 py-2 rounded-xl text-xs border outline-none bg-white/5 min-w-[220px]"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+        />
       </div>
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl border p-12 text-center" style={{ background: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
           <p className="text-4xl mb-3">🎫</p>
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No gate pass requests in this category.</p>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No gate pass requests found.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -101,14 +139,14 @@ export default function GatePassClient({ passes }: { passes: any[] }) {
                     <button
                       onClick={() => handleStatus(pass.id, "rejected")}
                       disabled={updating === pass.id}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20 disabled:opacity-50"
                     >
                       {updating === pass.id ? "..." : "Reject"}
                     </button>
                     <button
                       onClick={() => handleStatus(pass.id, "approved")}
                       disabled={updating === pass.id}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors border border-emerald-500/20"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors border border-emerald-500/20 disabled:opacity-50"
                     >
                       {updating === pass.id ? "..." : "Approve"}
                     </button>

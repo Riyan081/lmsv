@@ -53,22 +53,32 @@ export const hostelController = {
     sendSuccess(res, "Gate pass requested", gatePass, 201);
   },
   getGatePasses: async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const studentId = user?.role === "student" ? user.id : (req.query.studentId as string);
     const result = await hostelService.getGatePasses({
-      studentId: req.query.studentId as string, status: req.query.status as string,
-      page: parseInt(req.query.page as string) || 1, limit: parseInt(req.query.limit as string) || 20,
+      studentId,
+      status: req.query.status as string,
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 50,
     });
     sendPaginated(res, "Gate passes retrieved", result.records, {
-      page: result.page, limit: result.limit, total: result.total,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
     });
   },
   updateGatePassStatus: async (req: Request, res: Response) => {
     const user = (req as any).user;
     const gatePass = await hostelService.updateGatePassStatus(req.params.id as string, req.body.status, user.id);
     await logActivity({
-      userId: user.id, action: req.body.status === "approved" ? "approve" : "reject",
-      module: "hostel", entityType: "GatePass", entityId: gatePass.id,
+      userId: user.id,
+      action: req.body.status === "approved" ? "approve" : "reject",
+      module: "hostel",
+      entityType: "GatePass",
+      entityId: gatePass.id,
       description: `${req.body.status === "approved" ? "Approved" : "Rejected"} gate pass for ${(gatePass as any).student?.name ?? gatePass.studentId}`,
-      ipAddress: req.ip, userAgent: req.headers["user-agent"],
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
     });
     sendSuccess(res, `Gate pass ${req.body.status}`, gatePass);
   },
@@ -80,12 +90,19 @@ export const hostelController = {
     sendSuccess(res, "Complaint filed", complaint, 201);
   },
   getComplaints: async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const studentId = user?.role === "student" ? user.id : undefined;
     const result = await hostelService.getComplaints({
-      status: req.query.status as string, hostelId: req.query.hostelId as string,
-      page: parseInt(req.query.page as string) || 1, limit: parseInt(req.query.limit as string) || 20,
+      studentId,
+      status: req.query.status as string,
+      hostelId: req.query.hostelId as string,
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 50,
     });
     sendPaginated(res, "Complaints retrieved", result.records, {
-      page: result.page, limit: result.limit, total: result.total,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
     });
   },
   updateComplaintStatus: async (req: Request, res: Response) => {

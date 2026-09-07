@@ -40,14 +40,14 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
 
   const currentSection = sections.find((s) => s.id === selectedSectionId);
   const filteredSemesters = selectedSectionId && currentSection?.programCode
-    ? semesters.filter((sem) => sem.programCode.toUpperCase() === currentSection.programCode.toUpperCase())
+    ? semesters.filter((sem) => sem.programCode.toUpperCase() === currentSection.programCode!.toUpperCase())
     : semesters;
 
   const handleSectionChange = (sectionId: string) => {
     setSelectedSectionId(sectionId);
     const targetSection = sections.find((s) => s.id === sectionId);
     const validSems = sectionId && targetSection?.programCode
-      ? semesters.filter((sem) => sem.programCode.toUpperCase() === targetSection.programCode.toUpperCase())
+      ? semesters.filter((sem) => sem.programCode.toUpperCase() === targetSection.programCode!.toUpperCase())
       : semesters;
 
     if (!validSems.some((s) => s.id === selectedSemesterId)) {
@@ -65,7 +65,7 @@ export default function AutoGenerateButton({ sections, semesters }: AutoGenerate
       setSelectedSectionId(initialSectionId);
       const initialSection = sections[0];
       const validSems = initialSection?.programCode
-        ? semesters.filter((sem) => sem.programCode.toUpperCase() === initialSection.programCode.toUpperCase())
+        ? semesters.filter((sem) => sem.programCode.toUpperCase() === initialSection.programCode!.toUpperCase())
         : semesters;
       if (validSems.length > 0) {
         setSelectedSemesterId(validSems[0]!.id);

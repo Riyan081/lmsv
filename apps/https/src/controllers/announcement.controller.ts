@@ -3,6 +3,8 @@ import { announcementService } from "../services/announcement.service.js";
 import { sendSuccess, sendPaginated } from "../utils/response.js";
 import { logActivity } from "../middleware/activity-logger.js";
 
+import prisma from "@repo/db/client";
+
 export const announcementController = {
   create: async (req: Request, res: Response) => {
     const user = (req as any).user;
@@ -29,8 +31,21 @@ export const announcementController = {
 
   getMyAnnouncements: async (req: Request, res: Response) => {
     const user = (req as any).user;
+    let departmentId = user.departmentId;
+    let sectionId = user.sectionId;
+    if (!departmentId || !sectionId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { departmentId: true, sectionId: true },
+      });
+      if (dbUser) {
+        departmentId = departmentId || dbUser.departmentId;
+        sectionId = sectionId || dbUser.sectionId;
+      }
+    }
+
     const result = await announcementService.getForUser(
-      user.id, user.role, user.departmentId, user.sectionId,
+      user.id, user.role, departmentId, sectionId,
       parseInt(req.query.page as string) || 1, parseInt(req.query.limit as string) || 20,
     );
     sendPaginated(res, "Your announcements", result.records, {

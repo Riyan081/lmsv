@@ -2,6 +2,7 @@
 
 import { authClient } from "@repo/auth/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface TopbarProps {
   user: {
@@ -38,26 +39,34 @@ export default function Topbar({ user }: TopbarProps) {
         borderColor: "var(--color-border)",
       }}
     >
-      {/* Left — Breadcrumb / Page title area */}
+      {/* Left — Breadcrumb / Title */}
       <div className="flex items-center gap-3">
         <h2 className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
           University LMS
         </h2>
       </div>
 
-      {/* Right — User info */}
+      {/* Right — User info & Actions */}
       <div className="flex items-center gap-4">
         {/* Role badge */}
         <span
-          className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${ROLE_COLORS[user.role] || ROLE_COLORS.student}`}
+          className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+            ROLE_COLORS[user.role] || ROLE_COLORS.student
+          }`}
         >
           {user.role}
         </span>
 
-        {/* User info */}
-        <div className="flex items-center gap-3">
+        {/* User info & Avatar (Link to Profile) */}
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 p-1 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer"
+        >
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
+            <p
+              className="text-sm font-medium group-hover:text-purple-300 transition-colors"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               {user.name}
             </p>
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -67,7 +76,7 @@ export default function Topbar({ user }: TopbarProps) {
 
           {/* Avatar */}
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-md group-hover:scale-105 transition-transform"
             style={{ background: "linear-gradient(135deg, #8b5cf6, #3b82f6)" }}
           >
             {user.image ? (
@@ -77,16 +86,16 @@ export default function Topbar({ user }: TopbarProps) {
               user.name?.charAt(0).toUpperCase()
             )}
           </div>
+        </Link>
 
-          {/* Sign out */}
-          <button
-            onClick={handleSignOut}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors duration-150 hover:bg-white/[0.06]"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            Sign Out
-          </button>
-        </div>
+        {/* Sign out button */}
+        <button
+          onClick={handleSignOut}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors duration-150 hover:bg-white/[0.06]"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          Sign Out
+        </button>
       </div>
     </header>
   );

@@ -4,6 +4,8 @@ import { timetableGeneratorService } from "../services/timetable-generator.servi
 import { sendSuccess } from "../utils/response.js";
 import { logActivity } from "../middleware/activity-logger.js";
 
+import prisma from "@repo/db/client";
+
 export const timetableController = {
   /** Admin: list all timetable slots */
   getAll: async (_req: Request, res: Response) => {
@@ -26,9 +28,21 @@ export const timetableController = {
     if (user.role === "faculty") {
       const slots = await timetableService.getByFaculty(user.id, req.query.semesterId as string);
       sendSuccess(res, "Your timetable", slots);
-    } else if (user.role === "student" && user.sectionId) {
-      const slots = await timetableService.getBySection(user.sectionId, req.query.semesterId as string);
-      sendSuccess(res, "Your timetable", slots);
+    } else if (user.role === "student") {
+      let sectionId = user.sectionId;
+      if (!sectionId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { sectionId: true },
+        });
+        sectionId = dbUser?.sectionId;
+      }
+      if (sectionId) {
+        const slots = await timetableService.getBySection(sectionId, req.query.semesterId as string);
+        sendSuccess(res, "Your timetable", slots);
+        return;
+      }
+      sendSuccess(res, "No timetable available", []);
     } else {
       sendSuccess(res, "No timetable available", []);
     }

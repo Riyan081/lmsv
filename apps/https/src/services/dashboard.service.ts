@@ -62,8 +62,14 @@ export const dashboardService = {
       prisma.timetableSlot.findMany({
         where: { facultyId, dayOfWeek },
         include: {
-          subject: { select: { name: true, code: true } },
-          section: { select: { name: true, batch: { select: { name: true } } } },
+          subject: { select: { id: true, name: true, code: true } },
+          section: {
+            select: {
+              id: true,
+              name: true,
+              batch: { select: { id: true, name: true, program: { select: { code: true } } } },
+            },
+          },
         },
         orderBy: { startTime: "asc" },
       }),
@@ -71,8 +77,14 @@ export const dashboardService = {
         where: { facultyId },
         include: {
           subject: { select: { id: true, name: true, code: true } },
-          section: { select: { name: true } },
-          semester: { select: { number: true } },
+          section: {
+            select: {
+              id: true,
+              name: true,
+              batch: { select: { id: true, name: true, program: { select: { code: true } } } },
+            },
+          },
+          semester: { select: { id: true, number: true } },
         },
       }),
       prisma.leaveApplication.count({

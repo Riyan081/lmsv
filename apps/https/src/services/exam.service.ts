@@ -42,9 +42,17 @@ export const examService = {
     });
     if (!exam) throw new NotFoundError("Exam");
 
+    const toPrismaGrade = (gradeStr: string) => {
+      if (gradeStr === "A+" || gradeStr === "A_PLUS") return "A_PLUS";
+      if (gradeStr === "B+" || gradeStr === "B_PLUS") return "B_PLUS";
+      if (["A", "B", "C", "D", "F"].includes(gradeStr)) return gradeStr;
+      return "F";
+    };
+
     const results = await prisma.$transaction(
-      data.results.map((r: { studentId: string; marksObtained: number; grade?: string }) =>
-        prisma.result.upsert({
+      data.results.map((r: { studentId: string; marksObtained: number; grade?: string }) => {
+        const gradeValue = (r.grade ? toPrismaGrade(r.grade) : this.calculateGrade(r.marksObtained, exam.totalMarks)) as any;
+        return prisma.result.upsert({
           where: { studentId_examId: { studentId: r.studentId, examId: data.examId } },
           create: {
             studentId: r.studentId,
@@ -52,14 +60,14 @@ export const examService = {
             subjectId: exam.subjectId,
             semesterId: exam.semesterId,
             marksObtained: r.marksObtained,
-            grade: (r.grade || this.calculateGrade(r.marksObtained, exam.totalMarks)) as any,
+            grade: gradeValue,
           },
           update: {
             marksObtained: r.marksObtained,
-            grade: (r.grade || this.calculateGrade(r.marksObtained, exam.totalMarks)) as any,
+            grade: gradeValue,
           },
-        })
-      )
+        });
+      })
     );
     return { totalEntered: results.length, examId: data.examId };
   },
@@ -88,9 +96,9 @@ export const examService = {
 
   calculateGrade(marks: number, total: number): string {
     const percentage = (marks / total) * 100;
-    if (percentage >= 90) return "A+";
+    if (percentage >= 90) return "A_PLUS";
     if (percentage >= 80) return "A";
-    if (percentage >= 70) return "B+";
+    if (percentage >= 70) return "B_PLUS";
     if (percentage >= 60) return "B";
     if (percentage >= 50) return "C";
     if (percentage >= 40) return "D";
@@ -101,7 +109,7 @@ export const examService = {
     const where: any = { studentId };
     if (semesterId) where.semesterId = semesterId;
 
-    const results = await prisma.result.findMany({
+    const rawResults = await prisma.result.findMany({
       where,
       include: {
         exam: { select: { name: true, type: true, totalMarks: true, date: true } },
@@ -110,6 +118,17 @@ export const examService = {
       },
       orderBy: [{ semester: { number: "asc" } }, { subject: { name: "asc" } }],
     });
+
+    const fromPrismaGrade = (grade: string | null) => {
+      if (grade === "A_PLUS") return "A+";
+      if (grade === "B_PLUS") return "B+";
+      return grade || "F";
+    };
+
+    const results = rawResults.map((r) => ({
+      ...r,
+      grade: fromPrismaGrade(r.grade as string),
+    }));
 
     // Calculate SGPA per semester
     const semesters = new Map<number, { credits: number; gradePoints: number }>();
@@ -137,7 +156,7 @@ export const examService = {
   },
 
   gradeToPoints(grade: string): number {
-    const map: Record<string, number> = { "A+": 10, A: 9, "B+": 8, B: 7, C: 6, D: 5, F: 0 };
+    const map: Record<string, number> = { "A+": 10, A_PLUS: 10, A: 9, "B+": 8, B_PLUS: 8, B: 7, C: 6, D: 5, F: 0 };
     return map[grade] ?? 0;
   },
 };
