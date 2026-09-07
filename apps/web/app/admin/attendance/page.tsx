@@ -3,14 +3,12 @@ import PageHeader from "../../../components/ui/page-header";
 import AdminAttendanceClient from "./attendance-client";
 
 export default async function AdminAttendancePage() {
-  const [attendanceRes, subjectsRes, dashRes] = await Promise.all([
-    api.get("/api/attendance?limit=50"),
-    api.get("/api/subjects"),
+  const [attendanceRes, dashRes] = await Promise.all([
+    api.get("/api/attendance?limit=300"),
     api.get("/api/dashboard/admin"),
   ]);
 
   const records: any[] = attendanceRes.data || [];
-  const subjects: any[] = subjectsRes.data || [];
   const stats = dashRes.data?.stats;
 
   return (
@@ -34,7 +32,7 @@ export default async function AdminAttendancePage() {
         ))}
       </div>
 
-      <AdminAttendanceClient records={records} subjects={subjects} />
+      <AdminAttendanceClient records={records} />
     </div>
   );
 }

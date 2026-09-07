@@ -33,10 +33,10 @@ interface Subject {
 
 export default function AdminAttendanceClient({
   records,
-  subjects,
+  subjects: _subjects,
 }: {
   records: AttendanceRecord[];
-  subjects: Subject[];
+  subjects?: Subject[];
 }) {
   const [subjectFilter, setSubjectFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -46,18 +46,20 @@ export default function AdminAttendanceClient({
 
   // Derive unique sections and departments from records
   const sections = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; batchName: string }>();
+    const map = new Map<string, { id: string; name: string; batchName: string; deptId?: string }>();
     for (const r of records) {
       if (r.student.section) {
+        if (deptFilter && r.student.department?.id !== deptFilter) continue;
         map.set(r.student.section.id, {
           id: r.student.section.id,
           name: r.student.section.name,
           batchName: r.student.batch?.name || "",
+          deptId: r.student.department?.id,
         });
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [records]);
+  }, [records, deptFilter]);
 
   const departments = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string }>();
@@ -68,6 +70,19 @@ export default function AdminAttendanceClient({
     }
     return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
   }, [records]);
+
+  // Derive subjects from records, respecting dept and section filters
+  const availableSubjects = useMemo(() => {
+    const map = new Map<string, Subject>();
+    for (const r of records) {
+      if (deptFilter && r.student.department?.id !== deptFilter) continue;
+      if (sectionFilter && r.student.section?.id !== sectionFilter) continue;
+      if (r.subject) {
+        map.set(r.subject.id, r.subject);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
+  }, [records, deptFilter, sectionFilter]);
 
   const filtered = useMemo(() => {
     return records.filter((r) => {
@@ -131,7 +146,7 @@ export default function AdminAttendanceClient({
 
         <div className="flex flex-wrap gap-3">
           {/* Dept */}
-          <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setSectionFilter(""); }} className={inputCls} style={inputStyle}>
+          <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setSectionFilter(""); setSubjectFilter(""); }} className={inputCls} style={inputStyle}>
             <option value="">All Departments</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
@@ -139,7 +154,7 @@ export default function AdminAttendanceClient({
           </select>
 
           {/* Section */}
-          <select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} className={inputCls} style={inputStyle}>
+          <select value={sectionFilter} onChange={(e) => { setSectionFilter(e.target.value); setSubjectFilter(""); }} className={inputCls} style={inputStyle}>
             <option value="">All Sections</option>
             {sections.map((s) => (
               <option key={s.id} value={s.id}>Section {s.name} — {s.batchName}</option>
@@ -149,7 +164,7 @@ export default function AdminAttendanceClient({
           {/* Subject */}
           <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className={`${inputCls} min-w-[180px]`} style={inputStyle}>
             <option value="">All Subjects</option>
-            {subjects.map((s) => (
+            {availableSubjects.map((s) => (
               <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
             ))}
           </select>

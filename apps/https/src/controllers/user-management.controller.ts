@@ -3,12 +3,14 @@ import { userManagementService } from "../services/user-management.service.js";
 import { sendSuccess } from "../utils/response.js";
 
 export const userManagementController = {
-  /** GET /api/users?role=student&sectionId=...&batchId=... */
+  /** GET /api/users?role=student&sectionId=...&batchId=...&subjectId=...&semesterId=... */
   list: async (req: Request, res: Response) => {
     const role = (req.query.role as string) || "student";
     const users = await userManagementService.listByRole(role, {
       sectionId: req.query.sectionId as string | undefined,
       batchId: req.query.batchId as string | undefined,
+      subjectId: req.query.subjectId as string | undefined,
+      semesterId: req.query.semesterId as string | undefined,
     });
     sendSuccess(res, `${role}s retrieved`, users);
   },

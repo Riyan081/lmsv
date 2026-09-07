@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 interface Subject {
@@ -27,6 +27,18 @@ export default function CreateExamForm({ subjects }: CreateExamFormProps) {
   const [error, setError] = useState("");
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const router = useRouter();
+
+  const groupedSubjects = useMemo(() => {
+    const groups: Record<string, Subject[]> = {};
+    for (const s of subjects) {
+      const semLabel = s.semester
+        ? `${s.semester.program?.code || "Program"} — Semester ${s.semester.number}`
+        : "General / Other";
+      if (!groups[semLabel]) groups[semLabel] = [];
+      groups[semLabel].push(s);
+    }
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [subjects]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -151,11 +163,14 @@ export default function CreateExamForm({ subjects }: CreateExamFormProps) {
               onChange={(e) => setSelectedSubject(subjects.find((s) => s.id === e.target.value) || null)}
             >
               <option value="">Select subject...</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} — {s.name}
-                  {s.semester ? ` (Sem ${s.semester.number}, ${s.semester.program?.code})` : ""}
-                </option>
+              {groupedSubjects.map(([groupName, items]) => (
+                <optgroup key={groupName} label={groupName} className="font-semibold text-purple-400 bg-gray-900">
+                  {items.map((s) => (
+                    <option key={s.id} value={s.id} className="text-gray-100 bg-gray-900 font-normal">
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             {selectedSubject?.semester && (

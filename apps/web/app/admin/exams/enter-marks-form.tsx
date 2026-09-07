@@ -36,9 +36,7 @@ export default function EnterMarksForm({ exam }: EnterMarksFormProps) {
     setFetchingStudents(true);
 
     // Fetch students who are in sections that study this subject
-    // We use the /api/users?role=student endpoint and filter by those with attendance for this subject
-    // Or just fetch all students as a fallback
-    fetch("http://localhost:3001/api/users?role=student", { credentials: "include" })
+    fetch(`http://localhost:3001/api/users?role=student&subjectId=${exam.subject.id}`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         const studs: Student[] = (data.data || []).map((u: any) => ({

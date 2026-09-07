@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import DataTable from "../../../components/ui/data-table";
+import DeleteRowButton from "../../../components/ui/delete-row-button";
 
 interface StudentsClientProps {
   students: any[];
   departments: any[];
   batches: any[];
-  columns: any[];
   activeSectionId?: string;
   activeBatchId?: string;
   activeDeptId?: string;
@@ -18,18 +17,101 @@ export default function StudentsClient({
   students,
   departments,
   batches,
-  columns,
   activeSectionId,
   activeBatchId,
   activeDeptId,
 }: StudentsClientProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-
   const [deptFilter, setDeptFilter] = useState(activeDeptId || "");
   const [batchFilter, setBatchFilter] = useState(activeBatchId || "");
   const [sectionFilter, setSectionFilter] = useState(activeSectionId || "");
   const [search, setSearch] = useState("");
+
+  const columns = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        render: (row: any) => (
+          <div>
+            <div className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              {row.name}
+            </div>
+            <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {row.email}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "enrollmentNo",
+        label: "Enrollment",
+        render: (row: any) => (
+          <span className="text-xs font-mono font-bold px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400">
+            {row.enrollmentNo || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "department",
+        label: "Dept",
+        render: (row: any) => (
+          <span className="text-xs font-medium px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400">
+            {row.department?.code || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "batch",
+        label: "Batch",
+        render: (row: any) => (
+          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {row.batch?.name || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "section",
+        label: "Section",
+        render: (row: any) =>
+          row.section ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400">
+              {row.section.name}
+            </span>
+          ) : (
+            <span style={{ color: "var(--color-text-muted)" }}>—</span>
+          ),
+      },
+      {
+        key: "gender",
+        label: "Gender",
+        render: (row: any) => (
+          <span className="text-xs capitalize" style={{ color: "var(--color-text-secondary)" }}>
+            {row.gender || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        render: (row: any) => (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {row.phone || "—"}
+          </span>
+        ),
+      },
+      {
+        key: "actions",
+        label: "",
+        render: (row: any) => (
+          <DeleteRowButton
+            url={`http://localhost:3001/api/users/${row.id}`}
+            label={`student "${row.name}"`}
+          />
+        ),
+      },
+    ],
+    []
+  );
 
   // Build all sections from batches for the section dropdown
   const allSections = useMemo(() => {
@@ -58,7 +140,8 @@ export default function StudentsClient({
           !s.name.toLowerCase().includes(q) &&
           !(s.enrollmentNo || "").toLowerCase().includes(q) &&
           !(s.email || "").toLowerCase().includes(q)
-        ) return false;
+        )
+          return false;
       }
       return true;
     });
@@ -87,8 +170,13 @@ export default function StudentsClient({
 
   const hasFilters = deptFilter || batchFilter || sectionFilter || search;
 
-  const inputCls = "px-3 py-2 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors";
-  const inputStyle = { borderColor: "var(--color-border)", color: "var(--color-text-primary)", background: "var(--color-bg-card)" };
+  const inputCls =
+    "px-3 py-2 rounded-xl text-sm border bg-white/5 outline-none focus:border-purple-500/50 transition-colors";
+  const inputStyle = {
+    borderColor: "var(--color-border)",
+    color: "var(--color-text-primary)",
+    background: "var(--color-bg-card)",
+  };
 
   return (
     <div className="space-y-5">
@@ -109,20 +197,29 @@ export default function StudentsClient({
         {/* Department filter */}
         <select
           value={deptFilter}
-          onChange={(e) => { setDeptFilter(e.target.value); setBatchFilter(""); setSectionFilter(""); }}
+          onChange={(e) => {
+            setDeptFilter(e.target.value);
+            setBatchFilter("");
+            setSectionFilter("");
+          }}
           className={inputCls}
           style={inputStyle}
         >
           <option value="">All Departments</option>
           {departments.map((d: any) => (
-            <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+            <option key={d.id} value={d.id}>
+              {d.code} — {d.name}
+            </option>
           ))}
         </select>
 
         {/* Batch filter */}
         <select
           value={batchFilter}
-          onChange={(e) => { setBatchFilter(e.target.value); setSectionFilter(""); }}
+          onChange={(e) => {
+            setBatchFilter(e.target.value);
+            setSectionFilter("");
+          }}
           className={inputCls}
           style={inputStyle}
         >
@@ -131,7 +228,9 @@ export default function StudentsClient({
             ? batches.filter((b: any) => b.program?.department?.id === deptFilter)
             : batches
           ).map((b: any) => (
-            <option key={b.id} value={b.id}>{b.name} ({b.program?.code})</option>
+            <option key={b.id} value={b.id}>
+              {b.name} ({b.program?.code})
+            </option>
           ))}
         </select>
 
@@ -182,9 +281,7 @@ export default function StudentsClient({
             <div key={group.label}>
               {/* Section header */}
               <div className="flex items-center gap-3 mb-2">
-                <span
-                  className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                >
+                <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                   {group.label}
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>

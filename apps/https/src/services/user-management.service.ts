@@ -4,10 +4,29 @@ import { NotFoundError, ConflictError, BadRequestError } from "../utils/errors.j
 
 export const userManagementService = {
   /** List users by role, with optional filters */
-  async listByRole(role: string, filters?: { sectionId?: string; batchId?: string }) {
+  async listByRole(role: string, filters?: { sectionId?: string; batchId?: string; subjectId?: string; semesterId?: string }) {
     const where: any = { role };
     if (filters?.sectionId) where.sectionId = filters.sectionId;
     if (filters?.batchId) where.batchId = filters.batchId;
+
+    // If subjectId is given, find the sections that study this subject via FacultySubject
+    if (filters?.subjectId) {
+      const assignments = await prisma.facultySubject.findMany({
+        where: {
+          subjectId: filters.subjectId,
+          ...(filters.semesterId ? { semesterId: filters.semesterId } : {}),
+        },
+        select: { sectionId: true },
+      });
+      const sectionIds = [...new Set(assignments.map((a) => a.sectionId))];
+      if (sectionIds.length === 0) return []; // no sections assigned this subject
+      // If already filtered by section, intersect
+      if (where.sectionId) {
+        if (!sectionIds.includes(where.sectionId)) return [];
+      } else {
+        where.sectionId = { in: sectionIds };
+      }
+    }
     return prisma.user.findMany({
       where,
       include: {

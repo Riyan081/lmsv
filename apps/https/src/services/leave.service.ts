@@ -34,7 +34,18 @@ export const leaveService = {
       prisma.leaveApplication.findMany({
         where,
         include: {
-          user: { select: { id: true, name: true, role: true, enrollmentNo: true, employeeId: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              enrollmentNo: true,
+              employeeId: true,
+              department: { select: { id: true, name: true, code: true } },
+              batch: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true } },
+            },
+          },
           approvedBy: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: "desc" },

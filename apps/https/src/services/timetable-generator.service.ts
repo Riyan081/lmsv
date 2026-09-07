@@ -110,28 +110,36 @@ export const timetableGeneratorService = {
       };
     }
 
-    // ── 4. Load existing timetable slots for SAME SEMESTER (all sections) ───
-    //    This catches cross-section faculty conflicts (E1, E11)
-    const existingSlots = await prisma.timetableSlot.findMany({
-      where: { semesterId },
+    // ── 4. Load existing timetable slots for ALL semesters ─────────────────
+    //    Multiple semesters run concurrently (e.g. Sem 3 + Sem 5 in Jul-Dec).
+    //    We need ALL slots to detect faculty conflicts across semesters, not
+    //    just within the same semesterId. Section-busy is still per-semester.
+    const allExistingSlots = await prisma.timetableSlot.findMany({
       select: {
         id: true,
         facultyId: true,
         sectionId: true,
         subjectId: true,
+        semesterId: true,
         dayOfWeek: true,
         startTime: true,
         endTime: true,
       },
     });
+    // For section-busy and E8 gap-fill, we only care about this semester
+    const existingSlots = allExistingSlots.filter((s) => s.semesterId === semesterId);
 
     // ── 5. Clear existing slots for THIS section if requested ────────────────
     if (config.clearExisting) {
       await prisma.timetableSlot.deleteMany({ where: { sectionId, semesterId } });
-      // Remove cleared section's slots from existingSlots too
+      // Remove cleared section's slots from both arrays
       const remainingExisting = existingSlots.filter((s) => s.sectionId !== sectionId);
       existingSlots.length = 0;
       existingSlots.push(...remainingExisting);
+      // Also remove from allExistingSlots so faculty-busy map is accurate
+      const remainingAll = allExistingSlots.filter((s) => !(s.sectionId === sectionId && s.semesterId === semesterId));
+      allExistingSlots.length = 0;
+      allExistingSlots.push(...remainingAll);
       warnings.push("Existing timetable for this section was cleared before regeneration.");
     } else {
       // ── E8: "Fill gaps" — reduce slotsNeeded for subjects already placed ──
@@ -172,11 +180,12 @@ export const timetableGeneratorService = {
     // Recalculate after E8 adjustments
     const adjustedSlotsNeeded = tasks.reduce((sum, t) => sum + t.slotsNeeded, 0);
 
-    // ── 6. Build faculty-busy map ─────────────────────────────────────────────
+    // ── 6. Build faculty-busy map (ALL semesters!) ─────────────────────────────
     //    faculty_id → Set of "day-slotIdx" strings that are occupied
+    //    Uses allExistingSlots so cross-semester faculty conflicts are caught
     const facultyBusy = new Map<string, Set<string>>();
 
-    for (const slot of existingSlots) {
+    for (const slot of allExistingSlots) {
       if (!facultyBusy.has(slot.facultyId)) facultyBusy.set(slot.facultyId, new Set());
       const slotIdx = timeToSlotIdx(slot.startTime);
       if (slotIdx >= 0) {
@@ -197,8 +206,9 @@ export const timetableGeneratorService = {
 
     // ── 8. Sort tasks by most-constrained first ───────────────────────────────
     //    Faculty that teaches more sections = harder to place = goes first (E3)
+    //    Uses allExistingSlots to account for cross-semester load
     const facultyLoadMap = new Map<string, number>();
-    for (const slot of existingSlots) {
+    for (const slot of allExistingSlots) {
       facultyLoadMap.set(slot.facultyId, (facultyLoadMap.get(slot.facultyId) || 0) + 1);
     }
 

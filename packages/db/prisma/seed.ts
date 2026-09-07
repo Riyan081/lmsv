@@ -530,77 +530,163 @@ async function main() {
   console.log("  📌 2024 batch sections (sem3) have dedicated junior faculty");
 
   // ══════════════════════════════════════════════════════════════════
-  // 11. ATTENDANCE (last 2 weeks for CMPN-A students)
+  // 11. ATTENDANCE — last 2 weeks for ALL sections (realistic coverage)
+  //     Each section gets attendance for their own 3 theory subjects
+  //     with the correct faculty who teaches them.
   // ══════════════════════════════════════════════════════════════════
-  console.log("\n✅ Creating attendance records...");
+  console.log("\n✅ Creating attendance records for all sections...");
 
-  const cmpnAStudents = students.filter((_, i) => i < 6); // first 6 = CMPN-A
-  const attendanceSubjects = [subjects["CMPN501"], subjects["CMPN502"], subjects["CMPN503"]];
-  const statuses: AttendanceStatus[] = [AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.absent, AttendanceStatus.late];
+  // Map: sectionKey → { students, subjects (3 theory), faculty }
+  const attendanceSections = [
+    // ── Sem 5 (2023 batch) ───────────────────────────────────────────
+    {
+      label: "CMPN-A (Sem5)",
+      stuStart: 0, stuEnd: 6,
+      subs: ["CMPN501", "CMPN502", "CMPN503"],
+      facId: faculty["fac-cmpn-1"].id,
+    },
+    {
+      label: "CMPN-B (Sem5)",
+      stuStart: 6, stuEnd: 12,
+      subs: ["CMPN501", "CMPN502", "CMPN503"],
+      facId: faculty["fac-cmpn-1"].id,
+    },
+    {
+      label: "IT-A (Sem5)",
+      stuStart: 12, stuEnd: 18,
+      subs: ["IT501", "IT502", "IT503"],
+      facId: faculty["fac-it-1"].id,
+    },
+    {
+      label: "IT-B (Sem5)",
+      stuStart: 18, stuEnd: 24,
+      subs: ["IT501", "IT502", "IT503"],
+      facId: faculty["fac-it-1"].id,
+    },
+    {
+      label: "AIDS-A (Sem5)",
+      stuStart: 24, stuEnd: 30,
+      subs: ["AI501", "AI502", "AI503"],
+      facId: faculty["fac-ai-1"].id,
+    },
+    // ── Sem 3 (2024 batch) ───────────────────────────────────────────
+    {
+      label: "CMPN-24A (Sem3)",
+      stuStart: 30, stuEnd: 36,
+      subs: ["CMPN301", "CMPN302", "CMPN303"],
+      facId: faculty["fac-cmpn-5"].id,
+    },
+    {
+      label: "IT-24A (Sem3)",
+      stuStart: 36, stuEnd: 42,
+      subs: ["IT301", "IT302", "IT303"],
+      facId: faculty["fac-it-5"].id,
+    },
+    {
+      label: "AIDS-24A (Sem3)",
+      stuStart: 42, stuEnd: 48,
+      subs: ["AI301", "AI302", "AI303"],
+      facId: faculty["fac-ai-5"].id,
+    },
+  ];
+
+  // Weighted statuses: ~75% present, 15% absent, 10% late (realistic)
+  const weightedStatuses: AttendanceStatus[] = [
+    AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present,
+    AttendanceStatus.present, AttendanceStatus.present, AttendanceStatus.present,
+    AttendanceStatus.present, AttendanceStatus.present,
+    AttendanceStatus.absent, AttendanceStatus.absent,
+    AttendanceStatus.late,
+  ];
 
   let attCount = 0;
-  for (let dayBack = 1; dayBack <= 10; dayBack++) {
-    const date = new Date();
-    date.setDate(date.getDate() - dayBack);
-    if (date.getDay() === 0 || date.getDay() === 6) continue; // skip weekends
+  for (const sec of attendanceSections) {
+    const secStudents = students.slice(sec.stuStart, sec.stuEnd);
+    const secSubs = sec.subs.map((code) => subjects[code]!);
 
-    for (const sub of attendanceSubjects) {
-      for (const stu of cmpnAStudents) {
-        const status = statuses[Math.floor(Math.random() * statuses.length)]!;
-        await prisma.attendance.create({
-          data: {
-            studentId: stu.id,
-            subjectId: sub.id,
-            date,
-            period: (dayBack % 3) + 1,
-            status,
-            markedById: faculty["fac-cmpn-1"].id,
-          },
-        });
-        attCount++;
+    for (let dayBack = 1; dayBack <= 14; dayBack++) {
+      const date = new Date();
+      date.setDate(date.getDate() - dayBack);
+      if (date.getDay() === 0 || date.getDay() === 6) continue; // skip weekends
+
+      for (const sub of secSubs) {
+        for (const stu of secStudents) {
+          const status = weightedStatuses[Math.floor(Math.random() * weightedStatuses.length)]!;
+          await prisma.attendance.create({
+            data: {
+              studentId: stu.id,
+              subjectId: sub.id,
+              date,
+              period: (dayBack % 3) + 1,
+              status,
+              markedById: sec.facId,
+            },
+          });
+          attCount++;
+        }
       }
     }
+    console.log(`  ✅ Attendance for ${sec.label}`);
   }
-  console.log(`  ✅ ${attCount} attendance records (CMPN-A, last 2 weeks)`);
+  console.log(`  📊 ${attCount} total attendance records across all sections`);
 
   // ══════════════════════════════════════════════════════════════════
-  // 12. EXAMS & RESULTS
+  // 12. EXAMS & RESULTS — all depts, all semesters (Sem 3 + Sem 5)
   // ══════════════════════════════════════════════════════════════════
   console.log("\n📝 Creating exams & results...");
 
-  const examData = [
-    { name: "DSA Mid-Term",   type: ExamType.midterm,   subjectCode: "CMPN501", totalMarks: 30, date: new Date("2026-08-15") },
-    { name: "OS Mid-Term",    type: ExamType.midterm,   subjectCode: "CMPN502", totalMarks: 30, date: new Date("2026-08-16") },
-    { name: "DBMS Internal",  type: ExamType.internal,  subjectCode: "CMPN503", totalMarks: 20, date: new Date("2026-08-20") },
-    { name: "ML Mid-Term",    type: ExamType.midterm,   subjectCode: "AI501",   totalMarks: 30, date: new Date("2026-08-18") },
-    { name: "Web Dev Quiz 1", type: ExamType.internal,  subjectCode: "IT501",   totalMarks: 20, date: new Date("2026-08-10") },
+  // Helper: grade from percentage
+  const getGrade = (marks: number, total: number): Grade => {
+    const pct = marks / total;
+    return pct >= 0.9 ? Grade.A_PLUS : pct >= 0.8 ? Grade.A : pct >= 0.7 ? Grade.B_PLUS : pct >= 0.6 ? Grade.B : pct >= 0.5 ? Grade.C : Grade.D;
+  };
+
+  // Exam definitions: each has subject, semester, and student slice (matches seed order)
+  const examDefs = [
+    // ── CMPN Sem 5 ──────────────────────────────────────────────────
+    { name: "DSA Mid-Term",        type: ExamType.midterm,  subjectCode: "CMPN501", semId: sem5Cmpn, totalMarks: 30, date: "2026-08-15", stuStart: 0,  stuEnd: 12 }, // CMPN-A + B
+    { name: "OS Mid-Term",         type: ExamType.midterm,  subjectCode: "CMPN502", semId: sem5Cmpn, totalMarks: 30, date: "2026-08-16", stuStart: 0,  stuEnd: 12 },
+    { name: "DBMS Internal",       type: ExamType.internal, subjectCode: "CMPN503", semId: sem5Cmpn, totalMarks: 20, date: "2026-08-20", stuStart: 0,  stuEnd: 12 },
+    // ── IT Sem 5 ─────────────────────────────────────────────────────
+    { name: "Web Tech Mid-Term",   type: ExamType.midterm,  subjectCode: "IT501",   semId: sem5It,   totalMarks: 30, date: "2026-08-15", stuStart: 12, stuEnd: 24 }, // IT-A + B
+    { name: "CN Internal",         type: ExamType.internal, subjectCode: "IT502",   semId: sem5It,   totalMarks: 20, date: "2026-08-18", stuStart: 12, stuEnd: 24 },
+    { name: "SE Mid-Term",         type: ExamType.midterm,  subjectCode: "IT503",   semId: sem5It,   totalMarks: 30, date: "2026-08-20", stuStart: 12, stuEnd: 24 },
+    // ── AI/DS Sem 5 ──────────────────────────────────────────────────
+    { name: "ML Mid-Term",         type: ExamType.midterm,  subjectCode: "AI501",   semId: sem5Ai,   totalMarks: 30, date: "2026-08-18", stuStart: 24, stuEnd: 30 },
+    { name: "DL Internal",         type: ExamType.internal, subjectCode: "AI502",   semId: sem5Ai,   totalMarks: 20, date: "2026-08-22", stuStart: 24, stuEnd: 30 },
+    { name: "NLP Quiz 1",          type: ExamType.internal, subjectCode: "AI503",   semId: sem5Ai,   totalMarks: 20, date: "2026-08-10", stuStart: 24, stuEnd: 30 },
+    // ── CMPN Sem 3 ──────────────────────────────────────────────────
+    { name: "DSA Basics Mid-Term", type: ExamType.midterm,  subjectCode: "CMPN301", semId: sem3Cmpn, totalMarks: 30, date: "2026-08-17", stuStart: 30, stuEnd: 36 },
+    { name: "OOP Internal",        type: ExamType.internal, subjectCode: "CMPN302", semId: sem3Cmpn, totalMarks: 20, date: "2026-08-21", stuStart: 30, stuEnd: 36 },
+    // ── IT Sem 3 ─────────────────────────────────────────────────────
+    { name: "DBMS Basics Mid-Term",type: ExamType.midterm,  subjectCode: "IT301",   semId: sem3It,   totalMarks: 30, date: "2026-08-17", stuStart: 36, stuEnd: 42 },
+    { name: "Java Internal",       type: ExamType.internal, subjectCode: "IT302",   semId: sem3It,   totalMarks: 20, date: "2026-08-21", stuStart: 36, stuEnd: 42 },
+    // ── AI/DS Sem 3 ──────────────────────────────────────────────────
+    { name: "Python Mid-Term",     type: ExamType.midterm,  subjectCode: "AI301",   semId: sem3Ai,   totalMarks: 30, date: "2026-08-17", stuStart: 42, stuEnd: 48 },
+    { name: "Stats Internal",      type: ExamType.internal, subjectCode: "AI302",   semId: sem3Ai,   totalMarks: 20, date: "2026-08-21", stuStart: 42, stuEnd: 48 },
   ];
 
-  for (const e of examData) {
-    const semId = e.subjectCode.startsWith("CMPN") ? sem5Cmpn : e.subjectCode.startsWith("AI") ? sem5Ai : sem5It;
+  for (const e of examDefs) {
     const exam = await prisma.exam.create({
       data: {
-        name: e.name, type: e.type, totalMarks: e.totalMarks, date: e.date,
-        subjectId: subjects[e.subjectCode].id,
-        semesterId: semId,
+        name: e.name, type: e.type, totalMarks: e.totalMarks, date: new Date(e.date),
+        subjectId: subjects[e.subjectCode]!.id,
+        semesterId: e.semId,
         createdById: admin.id,
       },
     });
 
-    // Add results for relevant students
-    const examStudents = e.subjectCode.startsWith("CMPN") ? cmpnAStudents : students.slice(e.subjectCode.startsWith("AI") ? 24 : 12, e.subjectCode.startsWith("AI") ? 30 : 18);
+    const examStudents = students.slice(e.stuStart, e.stuEnd);
     for (const stu of examStudents) {
       const marks = Math.floor(Math.random() * (e.totalMarks * 0.4)) + Math.floor(e.totalMarks * 0.5);
-      const pct = marks / e.totalMarks;
-      const grade = pct >= 0.9 ? Grade.A_PLUS : pct >= 0.8 ? Grade.A : pct >= 0.7 ? Grade.B_PLUS : pct >= 0.6 ? Grade.B : pct >= 0.5 ? Grade.C : Grade.D;
       await prisma.result.create({
         data: {
           examId: exam.id,
           studentId: stu.id,
-          subjectId: subjects[e.subjectCode].id,
-          semesterId: semId,
+          subjectId: subjects[e.subjectCode]!.id,
+          semesterId: e.semId,
           marksObtained: marks,
-          grade,
+          grade: getGrade(marks, e.totalMarks),
         },
       });
     }
@@ -608,27 +694,49 @@ async function main() {
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // 13. LEAVE APPLICATIONS
+  // 13. LEAVE APPLICATIONS — across all batches, all departments
   // ══════════════════════════════════════════════════════════════════
   console.log("\n📋 Creating leave applications...");
 
   const leaveData = [
-    { userId: students[0]!.id, type: LeaveType.medical,    startDate: "2026-09-01", endDate: "2026-09-02", reason: "Fever and cold — doctor advised rest", status: ApprovalStatus.approved, approvedById: faculty["fac-cmpn-1"].id },
-    { userId: students[1]!.id, type: LeaveType.personal,   startDate: "2026-09-05", endDate: "2026-09-05", reason: "Family function at hometown",         status: ApprovalStatus.pending },
-    { userId: students[2]!.id, type: LeaveType.medical,    startDate: "2026-08-28", endDate: "2026-08-30", reason: "Dental surgery scheduled",             status: ApprovalStatus.approved, approvedById: faculty["fac-cmpn-2"].id },
-    { userId: faculty["fac-it-1"].id, type: LeaveType.personal, startDate: "2026-09-10", endDate: "2026-09-10", reason: "Personal work", status: ApprovalStatus.pending },
-    { userId: students[12]!.id, type: LeaveType.emergency, startDate: "2026-09-03", endDate: "2026-09-04", reason: "Food poisoning",                      status: ApprovalStatus.rejected },
+    // CMPN Sec-A (Sem 5)
+    { userId: students[0]!.id,  type: LeaveType.medical,    start: "2026-09-01", end: "2026-09-02", reason: "Fever and cold — doctor advised rest",      status: ApprovalStatus.approved,  approvedById: faculty["fac-cmpn-1"].id },
+    { userId: students[1]!.id,  type: LeaveType.personal,   start: "2026-09-05", end: "2026-09-05", reason: "Family function at hometown",               status: ApprovalStatus.pending },
+    { userId: students[2]!.id,  type: LeaveType.medical,    start: "2026-08-28", end: "2026-08-30", reason: "Dental surgery scheduled",                  status: ApprovalStatus.approved,  approvedById: faculty["fac-cmpn-2"].id },
+    // CMPN Sec-B (Sem 5)
+    { userId: students[6]!.id,  type: LeaveType.emergency,  start: "2026-09-03", end: "2026-09-04", reason: "Grandparent hospitalized",                  status: ApprovalStatus.approved,  approvedById: faculty["fac-cmpn-1"].id },
+    { userId: students[7]!.id,  type: LeaveType.personal,   start: "2026-09-06", end: "2026-09-06", reason: "College interview at another institution",   status: ApprovalStatus.rejected },
+    // IT Sec-A (Sem 5)
+    { userId: students[12]!.id, type: LeaveType.emergency,  start: "2026-09-03", end: "2026-09-04", reason: "Food poisoning",                            status: ApprovalStatus.approved,  approvedById: faculty["fac-it-1"].id },
+    { userId: students[13]!.id, type: LeaveType.personal,   start: "2026-09-08", end: "2026-09-08", reason: "Government exam (bank PO)",                 status: ApprovalStatus.pending },
+    // IT Sec-B (Sem 5)
+    { userId: students[18]!.id, type: LeaveType.medical,    start: "2026-08-25", end: "2026-08-26", reason: "Eye flu — highly contagious, self-isolating", status: ApprovalStatus.approved, approvedById: faculty["fac-it-2"].id },
+    // AI Sec-A (Sem 5)
+    { userId: students[24]!.id, type: LeaveType.personal,   start: "2026-09-10", end: "2026-09-11", reason: "Sibling's wedding",                         status: ApprovalStatus.pending },
+    { userId: students[25]!.id, type: LeaveType.medical,    start: "2026-09-04", end: "2026-09-05", reason: "Appendix pain — under observation",         status: ApprovalStatus.approved,  approvedById: faculty["fac-ai-1"].id },
+    // CMPN 2024 (Sem 3)
+    { userId: students[30]!.id, type: LeaveType.personal,   start: "2026-09-12", end: "2026-09-12", reason: "Scholarship interview",                     status: ApprovalStatus.pending },
+    { userId: students[31]!.id, type: LeaveType.medical,    start: "2026-09-01", end: "2026-09-02", reason: "Viral infection",                           status: ApprovalStatus.approved,  approvedById: faculty["fac-cmpn-5"].id },
+    // IT 2024 (Sem 3)
+    { userId: students[36]!.id, type: LeaveType.emergency,  start: "2026-09-07", end: "2026-09-08", reason: "Death in family",                           status: ApprovalStatus.approved,  approvedById: faculty["fac-it-5"].id },
+    // AI 2024 (Sem 3)
+    { userId: students[42]!.id, type: LeaveType.personal,   start: "2026-09-09", end: "2026-09-09", reason: "Cultural fest participation",               status: ApprovalStatus.pending },
+    // Faculty leave
+    { userId: faculty["fac-it-1"].id,   type: LeaveType.personal,  start: "2026-09-10", end: "2026-09-10", reason: "Personal work",                      status: ApprovalStatus.pending },
+    { userId: faculty["fac-cmpn-3"].id, type: LeaveType.medical,   start: "2026-09-02", end: "2026-09-03", reason: "Medical checkup",                    status: ApprovalStatus.approved,  approvedById: admin.id },
   ];
 
   for (const l of leaveData) {
     await prisma.leaveApplication.create({
       data: {
-        userId: l.userId, type: l.type, startDate: new Date(l.startDate), endDate: new Date(l.endDate),
-        reason: l.reason, status: l.status, approvedById: l.approvedById,
+        userId: l.userId, type: l.type,
+        startDate: new Date(l.start), endDate: new Date(l.end),
+        reason: l.reason, status: l.status,
+        approvedById: (l as any).approvedById,
       },
     });
   }
-  console.log(`  ✅ ${leaveData.length} leave applications`);
+  console.log(`  ✅ ${leaveData.length} leave applications across all batches`);
 
   // ══════════════════════════════════════════════════════════════════
   // 14. ACADEMIC CALENDAR EVENTS
